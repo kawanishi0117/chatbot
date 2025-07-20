@@ -21,11 +21,14 @@ AWS LambdaとAPI Gatewayを模擬したローカル開発環境をDockerで構�
 ├── backend/                           # Lambda関数群
 │   ├── chat-router/                   # ウェブフック処理・チャットルーティング
 │   │   ├── lambda_function.py        # ChatRouter Lambda関数
-│   │   ├── Dockerfile                # Docker設定
+│   │   ├── Dockerfile                # Docker設定（ローカル開発用）
 │   │   ├── docker-compose.yml        # Docker Compose設定
 │   │   ├── requirements.txt          # Python依存関係
 │   │   └── test_lambda.py            # テストスクリプト
 │   └── vector-processor/             # ベクター検索用Lambda（今後実装）
+├── template.yaml                     # AWS SAM テンプレート
+├── samconfig.toml                    # SAM CLI 設定
+├── .gitignore                        # Git除外設定
 ├── start-project.ps1                 # 起動スクリプト（PowerShell）
 └── README.md                         # このファイル
 ```
@@ -66,7 +69,33 @@ cd backend/chat-router
 python test_lambda.py
 ```
 
-## 🛠️ 開発者向けコマンド
+## 🚀 AWS デプロイメント
+
+### SAM CLIを使用したデプロイ
+
+```bash
+# ビルド
+sam build --parallel
+
+# 開発環境にデプロイ
+sam deploy --config-env dev
+
+# 本番環境にデプロイ
+sam deploy --config-env prod \
+  --parameter-overrides \
+    SlackSigningSecret=your-slack-secret \
+    LineChannelSecret=your-line-secret \
+    GithubAppKey=your-github-key
+```
+
+### デプロイで作成されるリソース
+
+- **API Gateway**: マルチチャネルウェブフック受信
+- **Lambda関数**: ChatRouter処理
+- **DynamoDB**: セッションログとナレッジベクター
+- **EventBridge**: 非同期処理用イベントバス
+
+## 🛠️ ローカル開発
 
 ### PowerShellスクリプトオプション
 

@@ -1,0 +1,62 @@
+version = 0.1
+
+[default]
+[default.build.parameters]
+parallel = true
+
+[default.deploy.parameters]
+stack_name = "chatbot-backend"
+s3_bucket = ""  # SAM CLI will create a bucket if not specified
+s3_prefix = "chatbot"
+region = "ap-northeast-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = [
+    "Stage=dev"
+]
+
+[dev]
+[dev.build.parameters]
+parallel = true
+
+[dev.deploy.parameters]
+stack_name = "chatbot-backend-dev"
+s3_bucket = ""
+s3_prefix = "chatbot-dev"
+region = "ap-northeast-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = [
+    "Stage=dev"
+]
+
+[staging]
+[staging.build.parameters]
+parallel = true
+
+[staging.deploy.parameters]
+stack_name = "chatbot-backend-staging"
+s3_bucket = ""
+s3_prefix = "chatbot-staging"
+region = "ap-northeast-1"
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = [
+    "Stage=staging"
+]
+
+[prod]
+[prod.build.parameters]
+parallel = true
+
+[prod.deploy.parameters]
+stack_name = "chatbot-backend-prod"
+s3_bucket = ""
+s3_prefix = "chatbot-prod"
+region = "ap-northeast-1"
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = [
+    "Stage=prod",
+    "BedrockModelId=anthropic.claude-3-haiku-20240307-v1:0"
+]
