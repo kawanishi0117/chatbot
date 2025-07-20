@@ -1,0 +1,12 @@
+# AWS Lambda Runtime Interface Emulator (ローカルテスト用)
+awslambdaric==2.0.7
+
+# JSONやHTTPリクエスト処理用
+requests==2.31.0
+
+# 開発とテスト用
+pytest==7.4.3
+pytest-mock==3.12.0
+
+# ログ処理
+python-json-logger==2.0.7
