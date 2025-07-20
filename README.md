@@ -38,8 +38,12 @@ AWS LambdaとAPI Gatewayを模擬したローカル開発環境をDockerで構�
 ### 前提条件
 
 - Docker Desktop がインストールされていること
+- AWS SAM CLI がインストールされていること
 - PowerShell が使用可能であること（Windows）
 - Python 3.11+ （テスト実行時）
+
+**SAM CLI インストール:**
+- [SAM CLI インストールガイド](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
 
 ### 1. 環境起動
 
@@ -55,18 +59,24 @@ PowerShellでプロジェクトルートから以下を実行：
 
 ### 2. API エンドポイント
 
-Lambda関数は以下のローカルエンドポイントで動作します：
+SAM Local APIは以下のローカルエンドポイントで動作します：
 
-- **ベースURL**: `http://localhost:9000/2015-03-31/functions/function/invocations`
-- **ヘルスチェック**: `/health`
-- **テストエンドポイント**: `/test`
+- **ベースURL**: `http://localhost:3000`
+- **ヘルスチェック**: `http://localhost:3000/health`
+- **テストエンドポイント**: `http://localhost:3000/test`
+- **Slack Webhook**: `http://localhost:3000/webhook/slack`
+- **LINE Webhook**: `http://localhost:3000/webhook/line`
+- **Teams Webhook**: `http://localhost:3000/webhook/teams`
 
 ### 3. テスト実行
 
 ```powershell
-# Lambda関数のテスト
+# SAM Local APIのテスト
 cd backend/chat-router
-python test_lambda.py
+python test_sam_local.py
+
+# または直接PowerShellから
+.\start-project.ps1 -Test
 ```
 
 ## 🚀 AWS デプロイメント
@@ -119,20 +129,18 @@ sam deploy --config-env prod \
 ### 手動Docker操作
 
 ```bash
-# ChatRouter Lambdaで作業
-cd backend/chat-router
+# SAM Local APIで作業
 
 # ビルド
-docker-compose build
+sam build --parallel
 
-# 起動
-docker-compose up -d
+# ローカルAPI起動
+sam local start-api --host 0.0.0.0 --port 3000
 
-# ログ確認
-docker-compose logs -f
+# 個別Lambda関数の実行
+sam local invoke ChatRouterFunction --event events/test-event.json
 
-# 停止
-docker-compose down
+# ログはリアルタイムでターミナルに表示されます
 ```
 
 ## 📡 API使用例
@@ -141,22 +149,29 @@ docker-compose down
 
 ```bash
 # ヘルスチェック
-curl -X POST http://localhost:9000/2015-03-31/functions/function/invocations \
-  -H "Content-Type: application/json" \
-  -d '{
-    "httpMethod": "GET",
-    "path": "/health",
-    "headers": {"Content-Type": "application/json"}
-  }'
+curl -X GET http://localhost:3000/health
 
 # テストエンドポイント
-curl -X POST http://localhost:9000/2015-03-31/functions/function/invocations \
+curl -X GET http://localhost:3000/test
+
+# Slack Webhook
+curl -X POST http://localhost:3000/webhook/slack \
   -H "Content-Type: application/json" \
   -d '{
-    "httpMethod": "GET",
-    "path": "/test",
-    "queryStringParameters": {"param1": "value1"},
-    "headers": {"Content-Type": "application/json"}
+    "token": "test-token",
+    "challenge": "test-challenge",
+    "type": "url_verification"
+  }'
+
+# LINE Webhook
+curl -X POST http://localhost:3000/webhook/line \
+  -H "Content-Type: application/json" \
+  -d '{
+    "events": [{
+      "type": "message",
+      "message": {"type": "text", "text": "/ask test message"},
+      "source": {"type": "user", "userId": "test-user"}
+    }]
   }'
 ```
 
@@ -164,13 +179,19 @@ curl -X POST http://localhost:9000/2015-03-31/functions/function/invocations \
 
 ```powershell
 # ヘルスチェック
-$body = @{
-    httpMethod = "GET"
-    path = "/health"
-    headers = @{"Content-Type" = "application/json"}
+Invoke-RestMethod -Uri "http://localhost:3000/health" -Method GET
+
+# テストエンドポイント
+Invoke-RestMethod -Uri "http://localhost:3000/test" -Method GET
+
+# Slack Webhook
+$slackBody = @{
+    token = "test-token"
+    challenge = "test-challenge"
+    type = "url_verification"
 } | ConvertTo-Json
 
-Invoke-RestMethod -Uri "http://localhost:9000/2015-03-31/functions/function/invocations" -Method POST -Body $body -ContentType "application/json"
+Invoke-RestMethod -Uri "http://localhost:3000/webhook/slack" -Method POST -Body $slackBody -ContentType "application/json"
 ```
 
 ## 🏗️ Lambda関数の機能

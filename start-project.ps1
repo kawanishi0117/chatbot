@@ -34,96 +34,152 @@ try {
     exit 1
 }
 
+# SAM CLI環境の確認
+Write-ColorText "🔍 Checking SAM CLI environment..." "Yellow"
+try {
+    $samVersion = sam --version
+    Write-ColorText "✅ SAM CLI found: $samVersion" "Green"
+} catch {
+    Write-ColorText "❌ SAM CLI not found. Please install SAM CLI." "Red"
+    Write-ColorText "Install from: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html" "Yellow"
+    exit 1
+}
+
 # 各種オプションの処理
 if ($Stop) {
-    Write-ColorText "🛑 Stopping Lambda containers..." "Yellow"
-    docker-compose -f backend/chat-router/docker-compose.yml down
-    Write-ColorText "✅ Containers stopped" "Green"
+    Write-ColorText "🛑 Stopping SAM local API..." "Yellow"
+    # SAMローカルAPIプロセスを停止
+    Get-Process -Name "sam" -ErrorAction SilentlyContinue | Stop-Process -Force
+    # Docker containers も停止
+    docker stop $(docker ps -q --filter "label=lambda-local") 2>$null
+    Write-ColorText "✅ SAM local environment stopped" "Green"
     exit 0
 }
 
 if ($Clean) {
-    Write-ColorText "🧹 Cleaning up Docker resources..." "Yellow"
-    docker-compose -f backend/chat-router/docker-compose.yml down --volumes --remove-orphans
+    Write-ColorText "🧹 Cleaning up SAM and Docker resources..." "Yellow"
+    # SAMプロセス停止
+    Get-Process -Name "sam" -ErrorAction SilentlyContinue | Stop-Process -Force
+    # SAMビルドキャッシュクリア
+    if (Test-Path ".aws-sam") {
+        Remove-Item -Recurse -Force ".aws-sam"
+        Write-ColorText "🗑️ Removed .aws-sam directory" "Green"
+    }
+    # Docker cleanup
+    docker stop $(docker ps -q --filter "label=lambda-local") 2>$null
     docker system prune -f
     Write-ColorText "✅ Cleanup completed" "Green"
     exit 0
 }
 
 if ($Logs) {
-    Write-ColorText "📋 Showing container logs..." "Yellow"
-    docker-compose -f backend/chat-router/docker-compose.yml logs -f
+    Write-ColorText "📋 Showing SAM local logs..." "Yellow"
+    Write-ColorText "💡 SAM local logs are shown in the terminal where sam local start-api is running" "Yellow"
+    Write-ColorText "💡 Lambda function logs appear in real-time during API calls" "Yellow"
     exit 0
 }
 
 # メイン起動処理
-Write-ColorText "🏗️ Building Lambda container..." "Yellow"
-Set-Location backend/chat-router
+Write-ColorText "🏗️ Building SAM application..." "Yellow"
 
 try {
-    # Docker イメージのビルド
-    docker-compose build
+    # SAM build
+    sam build --parallel
     if ($LASTEXITCODE -ne 0) {
-        throw "Docker build failed"
+        throw "SAM build failed"
     }
-    Write-ColorText "✅ Build completed successfully" "Green"
+    Write-ColorText "✅ SAM build completed successfully" "Green"
 
-    # コンテナの起動
-    Write-ColorText "🚀 Starting Lambda container..." "Yellow"
-    docker-compose up -d
-    if ($LASTEXITCODE -ne 0) {
-        throw "Container startup failed"
+    # SAM local API の起動
+    Write-ColorText "🚀 Starting SAM local API..." "Yellow"
+    Write-ColorText "💡 SAM local API will start on http://localhost:3000" "Yellow"
+    
+    # バックグラウンドでSAM local start-apiを実行
+    $samJob = Start-Job -ScriptBlock {
+        sam local start-api --host 0.0.0.0 --port 3000
     }
-    Write-ColorText "✅ Container started successfully" "Green"
+    
+    Write-ColorText "✅ SAM local API started in background (Job ID: $($samJob.Id))" "Green"
 
-    # コンテナの起動待ち
-    Write-ColorText "⏳ Waiting for container to be ready..." "Yellow"
-    Start-Sleep -Seconds 10
-
-    # コンテナのステータス確認
-    $containerStatus = docker-compose ps --services --filter "status=running"
-    if ($containerStatus -match "lambda-function") {
-        Write-ColorText "✅ Lambda container is running" "Green"
-    } else {
-        Write-ColorText "❌ Lambda container failed to start" "Red"
-        docker-compose logs
-        exit 1
+    # APIの起動待ち
+    Write-ColorText "⏳ Waiting for API to be ready..." "Yellow"
+    $maxAttempts = 30
+    $attempt = 0
+    $apiReady = $false
+    
+    while ($attempt -lt $maxAttempts -and -not $apiReady) {
+        try {
+            $response = Invoke-WebRequest -Uri "http://localhost:3000/health" -Method GET -TimeoutSec 2 -ErrorAction Stop
+            if ($response.StatusCode -eq 200) {
+                $apiReady = $true
+                Write-ColorText "✅ SAM local API is ready and responding" "Green"
+            }
+        } catch {
+            $attempt++
+            Start-Sleep -Seconds 2
+        }
+    }
+    
+    if (-not $apiReady) {
+        Write-ColorText "⚠️ API health check failed, but continuing (may need a few more seconds)" "Yellow"
     }
 
     # エンドポイント情報の表示
     Write-ColorText "" ""
-    Write-ColorText "📡 Lambda Endpoint Information:" "Cyan"
-    Write-ColorText "─────────────────────────────────" "Cyan"
-    Write-ColorText "Local Lambda URL: http://localhost:9000/2015-03-31/functions/function/invocations" "White"
-    Write-ColorText "Container Name: lambda-api-gateway" "White"
+    Write-ColorText "📡 SAM Local API Endpoint Information:" "Cyan"
+    Write-ColorText "─────────────────────────────────────" "Cyan"
+    Write-ColorText "Base URL: http://localhost:3000" "White"
+    Write-ColorText "Health Check: http://localhost:3000/health" "White"
+    Write-ColorText "Test Endpoint: http://localhost:3000/test" "White"
+    Write-ColorText "Slack Webhook: http://localhost:3000/webhook/slack" "White"
+    Write-ColorText "LINE Webhook: http://localhost:3000/webhook/line" "White"
+    Write-ColorText "Teams Webhook: http://localhost:3000/webhook/teams" "White"
     Write-ColorText "" ""
 
     # テストの実行
     if ($Test) {
         Write-ColorText "🧪 Running integration tests..." "Yellow"
-        python test_lambda.py
-        if ($LASTEXITCODE -eq 0) {
-            Write-ColorText "✅ All tests passed!" "Green"
+        # SAM用のテストスクリプトを実行
+        Set-Location backend/chat-router
+        
+        # テスト用環境変数を設定
+        $env:SAM_LOCAL_URL = "http://localhost:3000"
+        
+        # SAM用テストスクリプトがある場合は実行、なければcurlでテスト
+        if (Test-Path "test_sam_local.py") {
+            python test_sam_local.py
         } else {
-            Write-ColorText "❌ Some tests failed!" "Red"
+            Write-ColorText "Running basic endpoint tests..." "Yellow"
+            try {
+                $healthResponse = Invoke-RestMethod -Uri "http://localhost:3000/health" -Method GET
+                Write-ColorText "✅ Health check passed" "Green"
+                
+                $testResponse = Invoke-RestMethod -Uri "http://localhost:3000/test" -Method GET
+                Write-ColorText "✅ Test endpoint passed" "Green"
+                
+                Write-ColorText "✅ All basic tests passed!" "Green"
+            } catch {
+                Write-ColorText "❌ Some tests failed: $_" "Red"
+            }
         }
+        Set-Location ../..
     } else {
         Write-ColorText "💡 Tips:" "Cyan"
         Write-ColorText "  • Run tests: .\start-project.ps1 -Test" "White"
-        Write-ColorText "  • View logs: .\start-project.ps1 -Logs" "White"
-        Write-ColorText "  • Stop containers: .\start-project.ps1 -Stop" "White"
+        Write-ColorText "  • View logs: SAM logs appear in real-time in the terminal" "White"
+        Write-ColorText "  • Stop SAM: .\start-project.ps1 -Stop" "White"
         Write-ColorText "  • Clean up: .\start-project.ps1 -Clean" "White"
+        Write-ColorText "  • Manual testing: Use the endpoints shown above" "White"
     }
 
     Write-ColorText "" ""
-    Write-ColorText "🎉 Lambda environment is ready!" "Green"
-    Write-ColorText "Container will continue running in the background." "White"
+    Write-ColorText "🎉 SAM local environment is ready!" "Green"
+    Write-ColorText "API will continue running in the background." "White"
+    Write-ColorText "💡 Press Ctrl+C in the SAM terminal to stop the API" "Yellow"
 
 } catch {
     Write-ColorText "❌ Error occurred: $_" "Red"
-    Write-ColorText "📋 Showing container logs for debugging:" "Yellow"
-    docker-compose logs
+    Write-ColorText "📋 Check SAM build output above for details" "Yellow"
+    Write-ColorText "💡 Try: sam build --parallel" "Yellow"
     exit 1
-} finally {
-    Set-Location ../..
 }
