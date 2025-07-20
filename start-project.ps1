@@ -37,14 +37,14 @@ try {
 # 各種オプションの処理
 if ($Stop) {
     Write-ColorText "🛑 Stopping Lambda containers..." "Yellow"
-    docker-compose -f backend/api-gateway/docker-compose.yml down
+    docker-compose -f backend/chat-router/docker-compose.yml down
     Write-ColorText "✅ Containers stopped" "Green"
     exit 0
 }
 
 if ($Clean) {
     Write-ColorText "🧹 Cleaning up Docker resources..." "Yellow"
-    docker-compose -f backend/api-gateway/docker-compose.yml down --volumes --remove-orphans
+    docker-compose -f backend/chat-router/docker-compose.yml down --volumes --remove-orphans
     docker system prune -f
     Write-ColorText "✅ Cleanup completed" "Green"
     exit 0
@@ -52,13 +52,13 @@ if ($Clean) {
 
 if ($Logs) {
     Write-ColorText "📋 Showing container logs..." "Yellow"
-    docker-compose -f backend/api-gateway/docker-compose.yml logs -f
+    docker-compose -f backend/chat-router/docker-compose.yml logs -f
     exit 0
 }
 
 # メイン起動処理
 Write-ColorText "🏗️ Building Lambda container..." "Yellow"
-Set-Location backend/api-gateway
+Set-Location backend/chat-router
 
 try {
     # Docker イメージのビルド

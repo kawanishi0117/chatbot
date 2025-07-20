@@ -7,7 +7,8 @@ AWS LambdaとAPI Gatewayを模擬したローカル開発環境をDockerで構�
 
 このプロジェクトは以下の構成で設計されています：
 
-- **API Gateway処理**: ChatRouter Lambda（現在実装中）
+- **ウェブフック処理**: ChatRouter Lambda（現在実装中）
+  - ウェブフック受信、コマンドパース、セッション管理、回答生成
 - **ベクター検索**: データ生成・保存Lambda（今後実装予定）
 - **その他Lambda**: Retrieve, DecideAction, Summarize, Notifier等（今後実装予定）
 
@@ -18,7 +19,7 @@ AWS LambdaとAPI Gatewayを模擬したローカル開発環境をDockerで構�
 ```
 .
 ├── backend/                           # Lambda関数群
-│   ├── api-gateway/                   # API Gateway処理Lambda
+│   ├── chat-router/                   # ウェブフック処理・チャットルーティング
 │   │   ├── lambda_function.py        # ChatRouter Lambda関数
 │   │   ├── Dockerfile                # Docker設定
 │   │   ├── docker-compose.yml        # Docker Compose設定
@@ -61,7 +62,7 @@ Lambda関数は以下のローカルエンドポイントで動作します：
 
 ```powershell
 # Lambda関数のテスト
-cd backend/api-gateway
+cd backend/chat-router
 python test_lambda.py
 ```
 
@@ -89,8 +90,8 @@ python test_lambda.py
 ### 手動Docker操作
 
 ```bash
-# API Gateway Lambdaで作業
-cd backend/api-gateway
+# ChatRouter Lambdaで作業
+cd backend/chat-router
 
 # ビルド
 docker-compose build
@@ -164,7 +165,7 @@ Invoke-RestMethod -Uri "http://localhost:9000/2015-03-31/functions/function/invo
 
 ### Lambda関数の拡張
 
-`backend/api-gateway/lambda_function.py` を編集して新しいエンドポイントや機能を追加できます：
+`backend/chat-router/lambda_function.py` を編集して新しいエンドポイントや機能を追加できます：
 
 ```python
 # 新しいルートの追加例
@@ -175,7 +176,7 @@ if path == '/new-endpoint':
 
 ### 依存関係の追加
 
-`backend/api-gateway/requirements.txt` に新しいPythonパッケージを追加：
+`backend/chat-router/requirements.txt` に新しいPythonパッケージを追加：
 
 ```
 new-package==1.0.0

@@ -7,13 +7,15 @@ logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     """
-    ChatRouter Lambda - API Gatewayからのリクエストを処理
+    ChatRouter Lambda - ウェブフック経由の処理全般を担当
     
     主な機能:
-    - マルチチャネル（LINE/Slack/Teams）対応
+    - マルチチャネル（LINE/Slack/Teams）ウェブフック受信
     - コマンドパース（/ask, /質問, /investigate, /調査, /clear, /クリア等）
-    - セッション管理
-    - Quick ACK応答
+    - セッション管理とDynamoDB操作
+    - Quick ACK応答（<100ms）
+    - 回答生成とチャット処理
+    - EventBridge連携による非同期処理トリガー
     """
     try:
         # リクエスト情報をログに出力
