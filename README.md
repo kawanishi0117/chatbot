@@ -1,19 +1,32 @@
-# Lambda API Gateway Docker Project
+# Multi-Channel Chatbot Backend
 
-AWS LambdaとAPI Gatewayを模擬したローカル開発環境をDockerで構築するプロジェクトです。
+マルチチャネル（LINE/Slack/Teams）対応チャットボットのバックエンド環境です。  
+AWS LambdaとAPI Gatewayを模擬したローカル開発環境をDockerで構築します。
+
+## 🏗️ システム概要
+
+このプロジェクトは以下の構成で設計されています：
+
+- **API Gateway処理**: ChatRouter Lambda（現在実装中）
+- **ベクター検索**: データ生成・保存Lambda（今後実装予定）
+- **その他Lambda**: Retrieve, DecideAction, Summarize, Notifier等（今後実装予定）
+
+詳細は `document/初期設計書.md` をご参照ください。
 
 ## 📁 プロジェクト構成
 
 ```
 .
-├── backend/                    # Lambda関数とDocker設定
-│   ├── lambda_function.py     # Lambda関数のメインファイル
-│   ├── Dockerfile             # Lambda用Dockerファイル
-│   ├── docker-compose.yml     # Docker Compose設定
-│   ├── requirements.txt       # Python依存関係
-│   └── test_lambda.py         # テストスクリプト
-├── start-project.ps1          # 起動スクリプト（PowerShell）
-└── README.md                  # このファイル
+├── backend/                           # Lambda関数群
+│   ├── api-gateway/                   # API Gateway処理Lambda
+│   │   ├── lambda_function.py        # ChatRouter Lambda関数
+│   │   ├── Dockerfile                # Docker設定
+│   │   ├── docker-compose.yml        # Docker Compose設定
+│   │   ├── requirements.txt          # Python依存関係
+│   │   └── test_lambda.py            # テストスクリプト
+│   └── vector-processor/             # ベクター検索用Lambda（今後実装）
+├── start-project.ps1                 # 起動スクリプト（PowerShell）
+└── README.md                         # このファイル
 ```
 
 ## 🚀 クイックスタート
@@ -48,7 +61,7 @@ Lambda関数は以下のローカルエンドポイントで動作します：
 
 ```powershell
 # Lambda関数のテスト
-cd backend
+cd backend/api-gateway
 python test_lambda.py
 ```
 
@@ -76,8 +89,8 @@ python test_lambda.py
 ### 手動Docker操作
 
 ```bash
-# バックエンドディレクトリで作業
-cd backend
+# API Gateway Lambdaで作業
+cd backend/api-gateway
 
 # ビルド
 docker-compose build
@@ -151,7 +164,7 @@ Invoke-RestMethod -Uri "http://localhost:9000/2015-03-31/functions/function/invo
 
 ### Lambda関数の拡張
 
-`backend/lambda_function.py` を編集して新しいエンドポイントや機能を追加できます：
+`backend/api-gateway/lambda_function.py` を編集して新しいエンドポイントや機能を追加できます：
 
 ```python
 # 新しいルートの追加例
@@ -162,7 +175,7 @@ if path == '/new-endpoint':
 
 ### 依存関係の追加
 
-`backend/requirements.txt` に新しいPythonパッケージを追加：
+`backend/api-gateway/requirements.txt` に新しいPythonパッケージを追加：
 
 ```
 new-package==1.0.0

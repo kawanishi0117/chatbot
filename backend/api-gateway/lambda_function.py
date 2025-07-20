@@ -7,8 +7,13 @@ logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     """
-    AWS Lambda関数のエントリーポイント
-    API Gatewayからのリクエストを処理する
+    ChatRouter Lambda - API Gatewayからのリクエストを処理
+    
+    主な機能:
+    - マルチチャネル（LINE/Slack/Teams）対応
+    - コマンドパース（/ask, /質問, /investigate, /調査, /clear, /クリア等）
+    - セッション管理
+    - Quick ACK応答
     """
     try:
         # リクエスト情報をログに出力
