@@ -7,12 +7,20 @@ import logging
 import os
 from typing import Any, Dict
 
+# Lambda実行環境でのモジュールインポートを確保
+try:
+    # 直接インポート（Lambdaランタイムでは同じディレクトリ内のファイル）
+    import webhook_handler
+except ImportError:
+    # ローカル開発環境での相対インポート
+    from . import webhook_handler
+
 # ログ設定
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 # 環境変数からバージョンを取得（デフォルト値を設定）
-VERSION = os.environ.get('VERSION')
+VERSION = os.environ.get("VERSION")
 
 # CORS および共通ヘッダ定義
 COMMON_HEADERS: Dict[str, str] = {
@@ -26,6 +34,7 @@ CORS_HEADERS: Dict[str, str] = {
     ),
     "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
 }
+
 
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """
@@ -46,11 +55,11 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         logger.info("Received event: %s", json.dumps(event))
 
         # HTTPメソッドとパスを取得
-        http_method = event.get('httpMethod', 'UNKNOWN')
-        path = event.get('path', '/')
+        http_method = event.get("httpMethod", "UNKNOWN")
+        path = event.get("path", "/")
 
         # クエリパラメータを取得
-        query_params = event.get('queryStringParameters', {}) or {}
+        query_params = event.get("queryStringParameters", {}) or {}
 
         # リクエストボディを取得し JSON としてパース（失敗時は元文字列を保持）
         raw_body = event.get("body", "")
@@ -69,32 +78,40 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             "path": path,
             "queryParameters": query_params,
             "requestBody": body,
-            "timestamp": context.aws_request_id if context else "local-test"
+            "timestamp": context.aws_request_id if context else "local-test",
         }
 
         # パスに基づく簡単なルーティング
-        if path == '/health':
+        if path == "/health":
             # デバッグ用ログ出力
             logger.info("Health check endpoint accessed")
             logger.info("VERSION: %s", VERSION)
             print("-----" + VERSION)
-            response_data['status'] = 'healthy'
-            response_data['message'] = 'Service is running properly'
-            response_data['version'] = VERSION
-            response_data['service'] = 'ChatRouter'
-            response_data['debug'] = {
-                'version_printed': True,
-                'version_value': VERSION
-            }
-        elif path == '/test':
-            response_data['message'] = 'This is a test endpoint'
-            response_data['data'] = {"test": True, "version": VERSION}
+            response_data["status"] = "healthy"
+            response_data["message"] = "Service is running properly"
+            response_data["version"] = VERSION
+            response_data["service"] = "ChatRouter"
+            response_data["debug"] = {"version_printed": True, "version_value": VERSION}
+        elif path == "/test":
+            response_data["message"] = "This is a test endpoint"
+            response_data["data"] = {"test": True, "version": VERSION}
+        elif path.startswith("/webhook/"):
+            # Webhook処理を専用ハンドラーに委譲
+            logger.info(
+                "Webhook request received: path=%s, method=%s", path, http_method
+            )
+            return webhook_handler.handle_webhook_request(
+                event, context, path, http_method, body
+            )
+        else:
+            response_data["message"] = "Unknown endpoint"
+            response_data["statusCode"] = 404
 
         # 成功レスポンス
         return {
-            'statusCode': 200,
-            'headers': CORS_HEADERS,
-            'body': json.dumps(response_data, ensure_ascii=False)
+            "statusCode": 200,
+            "headers": CORS_HEADERS,
+            "body": json.dumps(response_data, ensure_ascii=False),
         }
 
     except (KeyError, TypeError, ValueError) as e:
@@ -102,10 +119,10 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
         # エラーレスポンス
         return {
-            'statusCode': 500,
-            'headers': COMMON_HEADERS,
-            'body': json.dumps({
-                'error': 'Internal server error',
-                'message': str(e)
-            }, ensure_ascii=False)
+            "statusCode": 500,
+            "headers": COMMON_HEADERS,
+            "body": json.dumps(
+                {"error": "Internal server error", "message": str(e)},
+                ensure_ascii=False,
+            ),
         }

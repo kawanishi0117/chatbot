@@ -1,1 +1,5 @@
+# Production dependencies
 # Currently no external dependencies required
+
+# Development dependencies (optional)
+# pylint>=3.0.0

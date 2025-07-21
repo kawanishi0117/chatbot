@@ -1,0 +1,29 @@
+[MAIN]
+# Lambda環境での実行を考慮した設定
+init-hook='import sys; sys.path.append("src")'
+
+[MESSAGES CONTROL]
+# Lambda環境でよく発生する警告を無効化
+disable=
+    missing-module-docstring,
+    missing-function-docstring,
+    missing-class-docstring,
+    import-error,
+    too-few-public-methods,
+    broad-except,
+    logging-fstring-interpolation
+
+[FORMAT]
+# コードフォーマット設定
+max-line-length=100
+indent-string='    '
+
+[VARIABLES]
+# 未使用変数の許可（Lambda context など）
+dummy-variables-rgx=_+$|(_[a-zA-Z0-9_]*[a-zA-Z0-9]+?$)|dummy|^ignored_|^unused_
+
+[DESIGN]
+# 設計に関する制限を緩和
+max-args=10
+max-locals=20
+max-attributes=15 

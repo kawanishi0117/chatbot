@@ -38,6 +38,26 @@ Resources:
           Properties:
             Path: /test
             Method: ANY
+        WebhookMessageHistory:
+          Type: HttpApi
+          Properties:
+            Path: /webhook/message-history
+            Method: POST
+        WebhookLineBot:
+          Type: HttpApi
+          Properties:
+            Path: /webhook/line
+            Method: POST
+        WebhookSlackBot:
+          Type: HttpApi
+          Properties:
+            Path: /webhook/slack
+            Method: POST
+        WebhookTeamsBot:
+          Type: HttpApi
+          Properties:
+            Path: /webhook/teams
+            Method: POST
 
 # Outputs
 Outputs:
