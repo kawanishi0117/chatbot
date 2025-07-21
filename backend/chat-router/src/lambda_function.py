@@ -4,11 +4,15 @@
 
 import json
 import logging
+import os
 from typing import Any, Dict
 
 # ログ設定
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+# 環境変数からバージョンを取得（デフォルト値を設定）
+VERSION = os.environ.get('VERSION')
 
 # CORS および共通ヘッダ定義
 COMMON_HEADERS: Dict[str, str] = {
@@ -36,6 +40,8 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     - EventBridge連携による非同期処理トリガー
     """
     try:
+        # バージョン情報をログ出力
+        logger.info("ChatRouter Lambda started - Version: %s", VERSION)
         # F-string を避け、logger の lazily formatting を活用
         logger.info("Received event: %s", json.dumps(event))
 
@@ -68,11 +74,21 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
         # パスに基づく簡単なルーティング
         if path == '/health':
+            # デバッグ用ログ出力
+            logger.info("Health check endpoint accessed")
+            logger.info("VERSION: %s", VERSION)
+            print("-----" + VERSION)
             response_data['status'] = 'healthy'
             response_data['message'] = 'Service is running properly'
+            response_data['version'] = VERSION
+            response_data['service'] = 'ChatRouter'
+            response_data['debug'] = {
+                'version_printed': True,
+                'version_value': VERSION
+            }
         elif path == '/test':
             response_data['message'] = 'This is a test endpoint'
-            response_data['data'] = {"test": True, "version": "1.0.0"}
+            response_data['data'] = {"test": True, "version": VERSION}
 
         # 成功レスポンス
         return {
@@ -92,4 +108,4 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 'error': 'Internal server error',
                 'message': str(e)
             }, ensure_ascii=False)
-        } 
+        }
