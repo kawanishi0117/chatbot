@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import Login from './components/Login';
-import Header from './components/Header';
-import Sidebar from './components/Sidebar';
+import { useState } from 'react';
 import ChatArea from './components/ChatArea';
-import { User, Chat, Message, AuthState } from './types';
+import Header from './components/Header';
+import Login from './components/Login';
+import Sidebar from './components/Sidebar';
+import { AuthState, Chat, Message } from './types';
 
 // デモ用のAI応答生成関数
 const generateAIResponse = (userMessage: string): string => {
