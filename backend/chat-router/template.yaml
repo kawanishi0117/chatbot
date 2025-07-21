@@ -1,0 +1,36 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: ChatRouter Lambda - Simple webhook handler
+
+# Global settings
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 128
+    Runtime: python3.12
+
+# Resources
+Resources:
+  ChatRouterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: src/lambda_function.lambda_handler
+      Description: Simple webhook handler for chat routing
+      Events:
+        HealthCheck:
+          Type: HttpApi
+          Properties:
+            Path: /health
+            Method: GET
+        TestEndpoint:
+          Type: HttpApi
+          Properties:
+            Path: /test
+            Method: ANY
+
+# Outputs
+Outputs:
+  ChatRouterFunctionArn:
+    Description: "ChatRouter Lambda function ARN"
+    Value: !GetAtt ChatRouterFunction.Arn 
