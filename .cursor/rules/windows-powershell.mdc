@@ -1,0 +1,11 @@
+---
+alwaysApply: true
+---
+
+# Windows PowerShell コマンドルール
+
+- `&&` は使用不可。代わりに `;` を使用
+- パス区切りは `\` または `/` を使用
+- コマンドは PowerShell 構文に準拠
+- 環境変数は `$env:VARIABLE_NAME` 形式
+- ファイル操作は PowerShell コマンドレットを使用
