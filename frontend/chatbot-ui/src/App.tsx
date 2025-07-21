@@ -1,0 +1,219 @@
+import React, { useState, useEffect } from 'react';
+import Login from './components/Login';
+import Header from './components/Header';
+import Sidebar from './components/Sidebar';
+import ChatArea from './components/ChatArea';
+import { User, Chat, Message, AuthState } from './types';
+
+// デモ用のAI応答生成関数
+const generateAIResponse = (userMessage: string): string => {
+  const responses = [
+    "とても興味深い質問ですね。詳しく教えていただけますか？",
+    "なるほど、それについて説明させていただきます。",
+    "その件についていくつかの選択肢があります。",
+    "参考になりそうな情報をお伝えします。",
+    "もう少し具体的に教えていただけると、より詳細にお答えできます。",
+    "それは重要なポイントですね。考慮すべき要素がいくつかあります。"
+  ];
+  
+  // 簡単なキーワードベースの応答
+  if (userMessage.includes('天気')) {
+    return "申し訳ございませんが、現在の天気情報を取得することができません。気象庁のサイトや天気アプリをご確認ください。";
+  }
+  
+  if (userMessage.includes('JavaScript') || userMessage.includes('プログラミング')) {
+    return "JavaScriptは非常に人気のあるプログラミング言語です。ウェブ開発において重要な役割を果たしており、フロントエンドからバックエンドまで幅広く使用されています。具体的にどの部分について知りたいですか？";
+  }
+  
+  if (userMessage.includes('レシピ') || userMessage.includes('料理')) {
+    return "料理に関するご質問ですね！具体的にどのような料理のレシピをお探しでしょうか？和食、洋食、中華料理など、ジャンルを教えていただけると、より具体的なご提案ができます。";
+  }
+  
+  if (userMessage.includes('勉強') || userMessage.includes('学習')) {
+    return "効率的な学習方法について説明しますね。まず、目標を明確にすること、計画的に進めること、アクティブラーニングを取り入れることが重要です。具体的にどの分野の学習についてご相談でしょうか？";
+  }
+  
+  return responses[Math.floor(Math.random() * responses.length)];
+};
+
+function App() {
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    isAuthenticated: false,
+    isLoading: false
+  });
+
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+
+  // 現在のチャットを取得
+  const currentChat = chats.find(chat => chat.id === currentChatId) || null;
+
+  // ログイン処理
+  const handleLogin = (email: string, password: string) => {
+    setAuthState({
+      user: {
+        id: '1',
+        email,
+        name: email.split('@')[0] || 'ユーザー'
+      },
+      isAuthenticated: true,
+      isLoading: false
+    });
+  };
+
+  // ログアウト処理
+  const handleLogout = () => {
+    setAuthState({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false
+    });
+    setChats([]);
+    setCurrentChatId(null);
+  };
+
+  // 新しいチャット作成
+  const handleCreateChat = () => {
+    const newChat: Chat = {
+      id: Date.now().toString(),
+      title: '新しいチャット',
+      messages: [],
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    setChats(prev => [newChat, ...prev]);
+    setCurrentChatId(newChat.id);
+    setIsSidebarOpen(false);
+  };
+
+  // チャット選択
+  const handleSelectChat = (chatId: string) => {
+    setCurrentChatId(chatId);
+    setIsSidebarOpen(false);
+  };
+
+  // チャット削除
+  const handleDeleteChat = (chatId: string) => {
+    setChats(prev => prev.filter(chat => chat.id !== chatId));
+    if (currentChatId === chatId) {
+      setCurrentChatId(null);
+    }
+  };
+
+  // メッセージ送信
+  const handleSendMessage = async (content: string) => {
+    if (!currentChatId) {
+      // 新しいチャットを作成
+      const newChat: Chat = {
+        id: Date.now().toString(),
+        title: content.length > 30 ? content.substring(0, 30) + '...' : content,
+        messages: [],
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      setChats(prev => [newChat, ...prev]);
+      setCurrentChatId(newChat.id);
+    }
+
+    // ユーザーメッセージを追加
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content,
+      role: 'user',
+      timestamp: new Date()
+    };
+
+    const targetChatId = currentChatId || Date.now().toString();
+    
+    setChats(prev => prev.map(chat => 
+      chat.id === targetChatId 
+        ? {
+            ...chat,
+            messages: [...chat.messages, userMessage],
+            updatedAt: new Date(),
+            title: chat.messages.length === 0 ? 
+              (content.length > 30 ? content.substring(0, 30) + '...' : content) : 
+              chat.title
+          }
+        : chat
+    ));
+
+    // タイピングインジケーター表示
+    setIsTyping(true);
+
+    // AI応答をシミュレート
+    setTimeout(() => {
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: generateAIResponse(content),
+        role: 'assistant',
+        timestamp: new Date()
+      };
+
+      setChats(prev => prev.map(chat => 
+        chat.id === targetChatId 
+          ? {
+              ...chat,
+              messages: [...chat.messages, aiMessage],
+              updatedAt: new Date()
+            }
+          : chat
+      ));
+
+      setIsTyping(false);
+    }, 1000 + Math.random() * 2000); // 1-3秒のランダムな遅延
+  };
+
+  // サイドバートグル
+  const handleToggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  // ログインしていない場合はログイン画面を表示
+  if (!authState.isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
+
+  return (
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* ヘッダー */}
+      <Header
+        user={authState.user!}
+        onLogout={handleLogout}
+        onToggleSidebar={handleToggleSidebar}
+        isSidebarOpen={isSidebarOpen}
+      />
+
+      {/* メインコンテンツ */}
+      <div className="flex-1 flex pt-16 overflow-hidden">
+        {/* サイドバー */}
+        <Sidebar
+          chats={chats}
+          currentChatId={currentChatId}
+          onSelectChat={handleSelectChat}
+          onCreateChat={handleCreateChat}
+          onDeleteChat={handleDeleteChat}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+        />
+
+        {/* チャットエリア */}
+        <div className={`flex-1 flex flex-col transition-all duration-300 ${
+          isSidebarOpen ? 'lg:ml-80' : 'lg:ml-80'
+        }`}>
+          <ChatArea
+            currentChat={currentChat}
+            onSendMessage={handleSendMessage}
+            isTyping={isTyping}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default App;
