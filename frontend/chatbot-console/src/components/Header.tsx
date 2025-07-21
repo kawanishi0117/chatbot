@@ -1,5 +1,5 @@
+import { Bell, LogOut, Menu, Settings, User } from 'lucide-react';
 import React from 'react';
-import { Settings, User, LogOut, Menu, Bell } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface HeaderProps {
@@ -13,7 +13,7 @@ const Header: React.FC<HeaderProps> = ({
   user,
   onLogout,
   onToggleSidebar,
-  isSidebarOpen
+  isSidebarOpen: _isSidebarOpen
 }) => {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">

@@ -1,17 +1,16 @@
-import React, { useState } from 'react';
-import { 
-  Database, 
-  Folder, 
-  File, 
-  CheckCircle, 
-  RefreshCw,
-  Save,
-  AlertCircle,
-  HardDrive,
-  Calendar,
-  Search
+import {
+	AlertCircle,
+	Calendar,
+	CheckCircle,
+	Database,
+	Folder,
+	HardDrive,
+	RefreshCw,
+	Save,
+	Search
 } from 'lucide-react';
-import { S3Folder, ChatbotConfig } from '../types';
+import React, { useState } from 'react';
+import { ChatbotConfig, S3Folder } from '../types';
 
 interface S3PanelProps {
   chatbot: ChatbotConfig;

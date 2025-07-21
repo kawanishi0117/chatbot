@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
-import { 
-  Github, 
-  Search, 
-  ExternalLink, 
-  CheckCircle, 
-  Lock, 
-  Unlock, 
-  RefreshCw,
-  Save,
-  AlertCircle
+import {
+	AlertCircle,
+	CheckCircle,
+	ExternalLink,
+	Github,
+	Lock,
+	RefreshCw,
+	Save,
+	Search,
+	Unlock
 } from 'lucide-react';
-import { GitHubRepo, ChatbotConfig } from '../types';
+import React, { useState } from 'react';
+import { ChatbotConfig, GitHubRepo } from '../types';
 
 interface GitHubPanelProps {
   chatbot: ChatbotConfig;

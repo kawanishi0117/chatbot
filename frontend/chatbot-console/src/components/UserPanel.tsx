@@ -1,19 +1,17 @@
-import React, { useState } from 'react';
-import { 
-  Users, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Search, 
-  UserCheck, 
-  UserX,
-  Shield,
-  Eye,
-  Mail,
-  Calendar,
-  Filter
+import {
+	Calendar,
+	Edit,
+	Eye,
+	Filter,
+	Mail,
+	Plus,
+	Search,
+	Shield,
+	Trash2,
+	Users
 } from 'lucide-react';
-import { User, UserAccess, ChatbotConfig } from '../types';
+import React, { useState } from 'react';
+import { ChatbotConfig, User, UserAccess } from '../types';
 
 interface UserPanelProps {
   chatbot: ChatbotConfig;

@@ -1,19 +1,18 @@
-import React, { useState } from 'react';
-import { 
-  Webhook, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  ExternalLink, 
-  CheckCircle, 
-  XCircle,
-  Copy,
-  Eye,
-  EyeOff,
-  Save,
-  AlertTriangle
+import {
+	AlertTriangle,
+	CheckCircle,
+	Copy,
+	Edit,
+	ExternalLink,
+	Eye,
+	EyeOff,
+	Plus,
+	Trash2,
+	Webhook,
+	XCircle
 } from 'lucide-react';
-import { WebhookConfig, ChatbotConfig } from '../types';
+import React, { useState } from 'react';
+import { ChatbotConfig, WebhookConfig } from '../types';
 
 interface WebhookPanelProps {
   chatbot: ChatbotConfig;
@@ -91,7 +90,7 @@ const WebhookPanel: React.FC<WebhookPanelProps> = ({ chatbot, onSave }) => {
       url: webhook?.url || '',
       events: webhook?.events || [],
       secret: webhook?.secret || `wh_secret_${Math.random().toString(36).substr(2, 16)}`,
-      isActive: webhook?.isActive || true
+      isActive: Boolean(webhook?.isActive ?? true)
     });
 
     const handleEventToggle = (eventId: string) => {

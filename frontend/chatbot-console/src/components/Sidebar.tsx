@@ -1,15 +1,15 @@
-import React from 'react';
-import { 
-  Bot, 
-  Plus, 
-  Settings, 
-  Users, 
-  Webhook, 
-  Github, 
-  Database,
-  Activity,
-  Shield
+import {
+	Activity,
+	Bot,
+	Database,
+	Github,
+	Plus,
+	Settings,
+	Shield,
+	Users,
+	Webhook
 } from 'lucide-react';
+import React from 'react';
 import { ChatbotConfig } from '../types';
 
 interface SidebarProps {
