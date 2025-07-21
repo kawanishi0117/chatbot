@@ -1,0 +1,72 @@
+import React from 'react';
+import { MessageSquare, Settings, LogOut, Menu } from 'lucide-react';
+import { User } from '../types';
+
+interface HeaderProps {
+  user: User;
+  onLogout: () => void;
+  onToggleSidebar: () => void;
+  isSidebarOpen: boolean;
+}
+
+const Header: React.FC<HeaderProps> = ({ user, onLogout, onToggleSidebar, isSidebarOpen }) => {
+  return (
+    <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-50">
+      <div className="flex items-center justify-between px-4 py-3">
+        {/* 左側：ロゴとメニューボタン */}
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={onToggleSidebar}
+            className="lg:hidden p-2 rounded-md hover:bg-gray-100 transition-colors"
+            aria-label="Toggle sidebar"
+          >
+            <Menu className="w-5 h-5 text-gray-600" />
+          </button>
+          
+          <div className="flex items-center space-x-2">
+            <div className="flex items-center justify-center w-8 h-8 bg-blue-600 rounded-lg">
+              <MessageSquare className="w-5 h-5 text-white" />
+            </div>
+            <h1 className="text-xl font-bold text-gray-900 hidden sm:block">ChatBot AI</h1>
+          </div>
+        </div>
+
+        {/* 右側：ユーザー情報とメニュー */}
+        <div className="flex items-center space-x-3">
+          {/* ユーザー情報 */}
+          <div className="hidden sm:flex items-center space-x-3">
+            <div className="text-right">
+              <p className="text-sm font-medium text-gray-900">{user.name}</p>
+              <p className="text-xs text-gray-500">{user.email}</p>
+            </div>
+            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+              <span className="text-sm font-medium text-blue-600">
+                {user.name.charAt(0).toUpperCase()}
+              </span>
+            </div>
+          </div>
+
+          {/* メニューボタン */}
+          <div className="flex items-center space-x-1">
+            <button
+              className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+              aria-label="Settings"
+            >
+              <Settings className="w-5 h-5 text-gray-600" />
+            </button>
+            
+            <button
+              onClick={onLogout}
+              className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+              aria-label="Logout"
+            >
+              <LogOut className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+};
+
+export default Header;
