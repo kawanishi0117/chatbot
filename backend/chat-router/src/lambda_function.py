@@ -1,14 +1,32 @@
+"""ChatRouter Lambda function module.
+
+マルチチャネル Webhook を受け取り、コマンドパースやセッション管理を行う。"""
+
 import json
 import logging
+from typing import Any, Dict
 
 # ログ設定
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-def lambda_handler(event, context):
+# CORS および共通ヘッダ定義
+COMMON_HEADERS: Dict[str, str] = {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+}
+CORS_HEADERS: Dict[str, str] = {
+    **COMMON_HEADERS,
+    "Access-Control-Allow-Headers": (
+        "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token"
+    ),
+    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+}
+
+def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """
     ChatRouter Lambda - ウェブフック経由の処理全般を担当
-    
+
     主な機能:
     - マルチチャネル（LINE/Slack/Teams）ウェブフック受信
     - コマンドパース（/ask, /質問, /investigate, /調査, /clear, /クリア等）
@@ -18,24 +36,26 @@ def lambda_handler(event, context):
     - EventBridge連携による非同期処理トリガー
     """
     try:
-        # リクエスト情報をログに出力
-        logger.info(f"Received event: {json.dumps(event)}")
-        
+        # F-string を避け、logger の lazily formatting を活用
+        logger.info("Received event: %s", json.dumps(event))
+
         # HTTPメソッドとパスを取得
         http_method = event.get('httpMethod', 'UNKNOWN')
         path = event.get('path', '/')
-        
+
         # クエリパラメータを取得
         query_params = event.get('queryStringParameters', {}) or {}
-        
-        # リクエストボディを取得
-        body = event.get('body', '')
-        if body:
+
+        # リクエストボディを取得し JSON としてパース（失敗時は元文字列を保持）
+        raw_body = event.get("body", "")
+        if raw_body:
             try:
-                body = json.loads(body)
+                body = json.loads(raw_body)
             except json.JSONDecodeError:
-                body = body
-        
+                body = raw_body
+        else:
+            body = ""
+
         # レスポンスデータを作成
         response_data = {
             "message": "Lambda function is working!",
@@ -45,7 +65,7 @@ def lambda_handler(event, context):
             "requestBody": body,
             "timestamp": context.aws_request_id if context else "local-test"
         }
-        
+
         # パスに基づく簡単なルーティング
         if path == '/health':
             response_data['status'] = 'healthy'
@@ -53,31 +73,23 @@ def lambda_handler(event, context):
         elif path == '/test':
             response_data['message'] = 'This is a test endpoint'
             response_data['data'] = {"test": True, "version": "1.0.0"}
-        
+
         # 成功レスポンス
         return {
             'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
-                'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
-            },
+            'headers': CORS_HEADERS,
             'body': json.dumps(response_data, ensure_ascii=False)
         }
-        
-    except Exception as e:
-        logger.error(f"Error processing request: {str(e)}")
-        
+
+    except (KeyError, TypeError, ValueError) as e:
+        logger.error("Error processing request: %s", str(e))
+
         # エラーレスポンス
         return {
             'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            'headers': COMMON_HEADERS,
             'body': json.dumps({
                 'error': 'Internal server error',
                 'message': str(e)
             }, ensure_ascii=False)
-        }
+        } 

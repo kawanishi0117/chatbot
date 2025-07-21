@@ -1,0 +1,4 @@
+[tool.ruff]
+line-length = 120
+# よくある長いログ行やURL行を許容
+ignore = ["E501"]
