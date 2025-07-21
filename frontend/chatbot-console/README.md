@@ -1,46 +1,127 @@
-# Getting Started with Create React App
+# ChatBot Console
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+チャットボットの設定と管理を行うWeb管理画面です。
 
-## Available Scripts
+## 特徴
 
-In the project directory, you can run:
+- **チャットボット管理**: 複数のチャットボットの作成・設定・管理
+- **GitHub連携**: GitHubリポジトリからドキュメントを取得
+- **S3連携**: S3フォルダからファイルを分析
+- **Webhook設定**: 外部システムとの連携設定
+- **ユーザー管理**: アクセス権限の設定・管理
+- **レスポンシブデザイン**: モバイル・タブレット・デスクトップ対応
+- **モダンUI**: Tailwind CSSを使用した美しいインターフェース
 
-### `npm start`
+## 技術スタック
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+- **フロントエンド**: React 19.1.0 + TypeScript
+- **スタイリング**: Tailwind CSS
+- **アイコン**: Lucide React
+- **ビルドツール**: Create React App
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+## セットアップ
 
-### `npm test`
+### 1. 依存関係のインストール
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```bash
+npm install
+```
 
-### `npm run build`
+### 2. 開発サーバーの起動
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```bash
+npm start
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+アプリケーションは http://localhost:3000 で起動します。
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### 3. ビルド
 
-### `npm run eject`
+```bash
+npm run build
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+## ディレクトリ構造
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```
+src/
+├── components/          # Reactコンポーネント
+│   ├── Login.tsx       # ログイン画面
+│   ├── Header.tsx      # ヘッダーコンポーネント
+│   ├── Sidebar.tsx     # サイドバーコンポーネント
+│   ├── OverviewPanel.tsx    # 概要パネル
+│   ├── GitHubPanel.tsx      # GitHub設定パネル
+│   ├── S3Panel.tsx          # S3設定パネル
+│   ├── WebhookPanel.tsx     # Webhook設定パネル
+│   └── UserPanel.tsx        # ユーザー管理パネル
+├── types/              # TypeScript型定義
+│   └── index.ts
+├── App.tsx            # メインアプリケーション
+├── index.tsx          # エントリーポイント
+└── index.css          # グローバルスタイル
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+## 機能詳細
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+### 認証・ログイン
+- メールアドレスとパスワードによるログイン
+- デモ用認証（任意の値でログイン可能）
+- セッション管理
 
-## Learn More
+### チャットボット管理
+- 複数チャットボットの切り替え
+- 基本情報の設定・編集
+- 稼働状況の管理
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### GitHub連携
+- リポジトリの検索・選択
+- プライベート/パブリックリポジトリ対応
+- 自動同期設定
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### S3連携
+- S3フォルダの検索・選択
+- ファイル形式フィルター
+- 同期頻度の設定
+
+### Webhook設定
+- 複数Webhookの管理
+- イベント種別の選択
+- シークレットキーの管理
+
+### ユーザー管理
+- ユーザー招待機能
+- 権限レベルの設定（閲覧者/編集者/管理者）
+- アクセス権限の管理
+
+## デモデータ
+
+開発・テスト用にモックデータが含まれています：
+- サンプルチャットボット設定
+- デモユーザーデータ
+- サンプルGitHubリポジトリ
+- サンプルS3フォルダ
+
+## 開発
+
+### コーディング規約
+- TypeScriptの型安全性を活用
+- 関数型コンポーネントを使用
+- Tailwind CSSでスタイリング
+- 分かりやすい変数名・関数名
+
+### レスポンシブデザイン
+- モバイルファースト設計
+- ブレークポイント: sm(640px), md(768px), lg(1024px), xl(1280px)
+- サイドバーはモバイルではオーバーレイ表示
+
+## 今後の拡張予定
+
+- セキュリティ設定パネルの実装
+- 実際のAPIとの連携
+- 国際化対応
+- ダークモード対応
+- より詳細な権限管理
+
+## ライセンス
+
+このプロジェクトはプライベートプロジェクトです。
