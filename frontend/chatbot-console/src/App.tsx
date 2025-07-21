@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import Login from './components/Login';
-import Header from './components/Header';
-import Sidebar from './components/Sidebar';
-import OverviewPanel from './components/OverviewPanel';
+import { useEffect, useState } from 'react';
 import GitHubPanel from './components/GitHubPanel';
+import Header from './components/Header';
+import Login from './components/Login';
+import OverviewPanel from './components/OverviewPanel';
 import S3Panel from './components/S3Panel';
-import WebhookPanel from './components/WebhookPanel';
+import Sidebar from './components/Sidebar';
 import UserPanel from './components/UserPanel';
+import WebhookPanel from './components/WebhookPanel';
 import { AuthState, ChatbotConfig } from './types';
 
 function App() {
@@ -61,7 +61,7 @@ function App() {
     }
   }, [authState.isAuthenticated, chatbots.length]);
 
-  const handleLogin = (email: string, password: string) => {
+  const handleLogin = (email: string, _password: string) => {
     // デモ用のログイン処理
     setAuthState({
       user: {

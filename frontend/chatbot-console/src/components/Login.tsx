@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
 import { Eye, EyeOff, Settings, Shield } from 'lucide-react';
+import React, { useState } from 'react';
 
 interface LoginProps {
   onLogin: (email: string, password: string) => void;

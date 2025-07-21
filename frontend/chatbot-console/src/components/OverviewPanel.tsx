@@ -1,17 +1,17 @@
-import React from 'react';
-import { 
-  Bot, 
-  Github, 
-  Database, 
-  Users, 
-  Activity, 
-  CheckCircle, 
-  XCircle,
-  AlertTriangle,
-  Edit,
-  ToggleLeft,
-  ToggleRight
+import {
+	Activity,
+	AlertTriangle,
+	Bot,
+	CheckCircle,
+	Database,
+	Edit,
+	Github,
+	ToggleLeft,
+	ToggleRight,
+	Users,
+	XCircle
 } from 'lucide-react';
+import React from 'react';
 import { ChatbotConfig } from '../types';
 
 interface OverviewPanelProps {
