@@ -1,90 +1,23 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: ChatRouter Lambda - AWS SAMテンプレート
+Description: ChatRouter Lambda - Simple webhook handler
 
-# グローバル設定
+# Global settings
 Globals:
   Function:
     Timeout: 30
     MemorySize: 128
-    Runtime: python3.11
-    Environment:
-      Variables:
-        STAGE: !Ref Stage
-        LOG_LEVEL: INFO
+    Runtime: python3.12
 
-# パラメータ
-Parameters:
-  Stage:
-    Type: String
-    Default: dev
-    AllowedValues: [dev, staging, prod]
-    Description: デプロイステージ
-  
-  BedrockModelId:
-    Type: String
-    Default: anthropic.claude-3-haiku-20240307-v1:0
-    Description: AI応答用のBedrockモデルID
-    
-  SlackSigningSecret:
-    Type: String
-    Default: ""
-    NoEcho: true
-    Description: Slackウェブフック検証用の署名シークレット
-    
-  LineChannelSecret:
-    Type: String
-    Default: ""
-    NoEcho: true
-    Description: LINEウェブフック検証用のチャネルシークレット
-    
-  TeamsSecret:
-    Type: String
-    Default: ""
-    NoEcho: true
-    Description: Teamsウェブフックシークレット
-    
-  GithubAppKey:
-    Type: String
-    Default: ""
-    NoEcho: true
-    Description: GitHub Appのプライベートキー
-
-# リソース定義
+# Resources
 Resources:
-  # ChatRouter Lambda Function
   ChatRouterFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ./
       Handler: src/lambda_function.lambda_handler
-      Description: ChatRouter Lambda - ウェブフック処理とチャットルーティングを処理
-      Environment:
-        Variables:
-          BEDROCK_MODEL_ID: !Ref BedrockModelId
-          SLACK_SIGNING_SECRET: !Ref SlackSigningSecret
-          LINE_CHANNEL_SECRET: !Ref LineChannelSecret
-          TEAMS_SECRET: !Ref TeamsSecret
-          GITHUB_APP_KEY: !Ref GithubAppKey
-          COMMAND_LANG_MAP: '{"ask":["ask","質問"],"investigate":["investigate","調査"],"clear":["clear","クリア"],"help":["help","ヘルプ"]}'
+      Description: Simple webhook handler for chat routing
       Events:
-        # Webhook endpoints
-        SlackWebhook:
-          Type: HttpApi
-          Properties:
-            Path: /webhook/slack
-            Method: POST
-        LineWebhook:
-          Type: HttpApi
-          Properties:
-            Path: /webhook/line
-            Method: POST
-        TeamsWebhook:
-          Type: HttpApi
-          Properties:
-            Path: /webhook/teams
-            Method: POST
-        # テストエンドポイント
         HealthCheck:
           Type: HttpApi
           Properties:
@@ -95,37 +28,9 @@ Resources:
           Properties:
             Path: /test
             Method: ANY
-      Policies:
-        - Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-                - bedrock:InvokeModel
-                - bedrock:InvokeModelWithResponseStream
-              Resource: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/*'
-            - Effect: Allow
-              Action:
-                - dynamodb:PutItem
-                - dynamodb:GetItem
-                - dynamodb:UpdateItem
-                - dynamodb:Query
-                - dynamodb:Scan
-              Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${Stage}-chatbot-*'
-            - Effect: Allow
-              Action:
-                - events:PutEvents
-              Resource: !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:event-bus/default'
-            - Effect: Allow
-              Action:
-                - secretsmanager:GetSecretValue
-              Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:chatbot/*'
 
-# アウトプット
+# Outputs
 Outputs:
   ChatRouterFunctionArn:
-    Description: "ChatRouter Lambda関数ARN"
-    Value: !GetAtt ChatRouterFunction.Arn
-
-  ChatRouterFunctionUrl:
-    Description: "ChatRouter Lambda関数URL"
-    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/webhook" 
+    Description: "ChatRouter Lambda function ARN"
+    Value: !GetAtt ChatRouterFunction.Arn 
