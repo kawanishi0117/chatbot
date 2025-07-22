@@ -1,6 +1,13 @@
 version: 2
 updates:
+  # フロントエンド
   - package-ecosystem: "npm"
-    directory: "/" # package.json のある場所
+    directory: "/frontend/chatbot-console"
     schedule:
-      interval: "weekly"  # daily / weekly / monthly から選べる
+      interval: "weekly"
+
+  # バックエンド
+  - package-ecosystem: "npm"
+    directory: "/backend/chat-router"
+    schedule:
+      interval: "weekly"
