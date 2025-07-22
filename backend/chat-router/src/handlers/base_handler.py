@@ -68,8 +68,7 @@ class BaseWebhookHandler(ABC):
                 )
 
             # プラットフォーム固有の前処理
-            pre_result = self._pre_process(body, event)
-            if pre_result:
+            if (pre_result := self._pre_process(body, event)) is not None:
                 return pre_result
 
             # メッセージの正規化
