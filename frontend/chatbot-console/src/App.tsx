@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import BotSettingsPanel from './components/BotSettingsPanel';
 import GitHubPanel from './components/GitHubPanel';
 import Header from './components/Header';
 import Login from './components/Login';
@@ -142,6 +143,15 @@ function App() {
   };
 
   const renderCurrentView = () => {
+    // ボット設定パネルは選択されたチャットボットに関係なく表示
+    if (currentView === 'bot-settings') {
+      return (
+        <BotSettingsPanel
+          currentUserId={authState.user?.id || 'anonymous'}
+        />
+      );
+    }
+
     if (!selectedChatbot) {
       return (
         <div className="flex-1 flex items-center justify-center text-gray-500">

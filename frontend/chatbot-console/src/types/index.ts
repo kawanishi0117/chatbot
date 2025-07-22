@@ -78,6 +78,37 @@ export interface FormField {
   validation?: (value: any) => string | null;
 }
 
+// ボット設定（新機能）
+export interface BotSettings {
+  botId: string;
+  botName: string;
+  description: string;
+  creatorId: string;
+  createdAt: number;
+  updatedAt: number;
+  isActive: boolean;
+}
+
+// ボット設定作成/更新リクエスト
+export interface BotSettingsCreateRequest {
+  botName: string;
+  description?: string;
+  creatorId: string;
+  isActive?: boolean;
+}
+
+export interface BotSettingsUpdateRequest {
+  botName?: string;
+  description?: string;
+  isActive?: boolean;
+}
+
+// ボット設定一覧レスポンス
+export interface BotSettingsListResponse {
+  bots: BotSettings[];
+  count: number;
+}
+
 // API応答
 export interface ApiResponse<T> {
   success: boolean;

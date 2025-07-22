@@ -33,6 +33,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const menuItems = [
     { id: 'overview', label: '概要', icon: Activity },
+    { id: 'bot-settings', label: 'ボット設定', icon: Settings },
     { id: 'github', label: 'GitHub設定', icon: Github },
     { id: 's3', label: 'S3設定', icon: Database },
     { id: 'webhooks', label: 'Webhook設定', icon: Webhook },

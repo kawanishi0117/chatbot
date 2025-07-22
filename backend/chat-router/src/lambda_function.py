@@ -11,9 +11,11 @@ from typing import Any, Dict
 try:
     import webhook_handler
     from common.responses import create_error_response, create_success_response
+    from handlers.bot_settings_handler import BotSettingsHandler
 except ImportError:
     from . import webhook_handler
     from .common.responses import create_error_response, create_success_response
+    from .handlers.bot_settings_handler import BotSettingsHandler
 
 # ログ設定
 logger = logging.getLogger()
@@ -90,6 +92,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return webhook_handler.handle_webhook_request(
                 event, context, path, http_method, body
             )
+        elif path.startswith("/api/bots"):
+            # ボット設定API処理
+            logger.info(
+                "Bot settings API request: path=%s, method=%s", path, http_method
+            )
+            bot_handler = BotSettingsHandler()
+            return bot_handler.handle_request(http_method, path, body, query_params)
         elif path == "/health":
             # ヘルスチェック用エンドポイント
             logger.info("Health check endpoint accessed")
