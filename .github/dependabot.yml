@@ -5,9 +5,13 @@ updates:
     directory: "/frontend/chatbot-console"
     schedule:
       interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/frontend/chatbot-ui"
+    schedule:
+      interval: "weekly"
 
   # バックエンド
-  - package-ecosystem: "npm"
+  - package-ecosystem: "pip"
     directory: "/backend/chat-router"
     schedule:
       interval: "weekly"
