@@ -8,7 +8,12 @@ import os
 from typing import Any, Dict
 
 # Lambda実行環境でのモジュールインポートを確保
-from . import webhook_handler
+try:
+    import webhook_handler
+    from common.responses import create_error_response, create_success_response
+except ImportError:
+    from . import webhook_handler
+    from .common.responses import create_error_response, create_success_response
 
 # ログ設定
 logger = logging.getLogger()
@@ -32,8 +37,7 @@ CORS_HEADERS: Dict[str, str] = {
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """
-    ChatRouter Lambda - ウェブフック経由の処理全般を担当
+    """ChatRouter Lambda - ウェブフック経由の処理全般を担当
 
     主な機能:
     - マルチチャネル（LINE/Slack/Teams）ウェブフック受信
@@ -53,12 +57,15 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     try:
         # バージョン情報をログ出力
         logger.info("ChatRouter Lambda started - Version: %s", VERSION)
-        # F-string を避け、logger の lazily formatting を活用
         logger.info("Received event: %s", json.dumps(event))
 
         # HTTPメソッドとパスを取得
         http_method = event.get("httpMethod", "UNKNOWN")
         path = event.get("path", "/")
+
+        # OPTIONSリクエストの処理（CORS プリフライト）
+        if http_method == "OPTIONS":
+            return _handle_options_request()
 
         # クエリパラメータを取得
         query_params = event.get("queryStringParameters", {}) or {}
@@ -74,31 +81,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         else:
             body = ""
 
-        # レスポンスデータを作成
-        response_data = {
-            "message": "Lambda function is working!",
-            "method": http_method,
-            "path": path,
-            "queryParameters": query_params,
-            "requestBody": body,
-            "timestamp": context.aws_request_id if context else "local-test",
-        }
-
-        # パスに基づく簡単なルーティング
-        if path == "/health":
-            # デバッグ用ログ出力
-            logger.info("Health check endpoint accessed")
-            logger.info("VERSION: %s", VERSION)
-            print("-----" + str(VERSION))
-            response_data["status"] = "healthy"
-            response_data["message"] = "Service is running properly"
-            response_data["version"] = VERSION
-            response_data["service"] = "ChatRouter"
-            response_data["debug"] = {"version_printed": True, "version_value": VERSION}
-        elif path == "/test":
-            response_data["message"] = "This is a test endpoint"
-            response_data["data"] = {"test": True, "version": VERSION}
-        elif path.startswith("/webhook/"):
+        # パスに基づくルーティング
+        if path.startswith("/webhook/"):
             # Webhook処理を専用ハンドラーに委譲
             logger.info(
                 "Webhook request received: path=%s, method=%s", path, http_method
@@ -106,43 +90,71 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return webhook_handler.handle_webhook_request(
                 event, context, path, http_method, body
             )
+        elif path == "/health":
+            # ヘルスチェック用エンドポイント
+            logger.info("Health check endpoint accessed")
+            response_data = {
+                "status": "healthy",
+                "message": "Service is running properly",
+                "version": VERSION or "unknown",
+                "service": "ChatRouter",
+            }
+            return create_success_response(response_data)
+        elif path == "/test":
+            # テスト用エンドポイント
+            response_data = {
+                "message": "This is a test endpoint",
+                "data": {"test": True, "version": VERSION},
+                "method": http_method,
+                "path": path,
+                "queryParameters": query_params,
+                "requestBody": body,
+                "timestamp": context.aws_request_id if context else "local-test",
+            }
+            return create_success_response(response_data)
+        elif path == "/" or path == "":
+            # 基本レスポンス（バージョン情報）
+            return create_success_response(
+                {
+                    "message": "ChatRouter Lambda is running",
+                    "version": VERSION or "unknown",
+                }
+            )
         else:
-            response_data["message"] = "Unknown endpoint"
-            response_data["statusCode"] = 404
-
-        # 成功レスポンス
-        return {
-            "statusCode": 200,
-            "headers": CORS_HEADERS,
-            "body": json.dumps(response_data, ensure_ascii=False),
-        }
+            # 不明なエンドポイント
+            return create_error_response(404, "Not Found", f"Unknown endpoint: {path}")
 
     except (KeyError, TypeError, ValueError) as e:
         logger.error("Error processing request: %s", str(e))
+        return create_error_response(
+            400, "Bad Request", "リクエストの処理中にエラーが発生しました"
+        )
 
-        # エラーレスポンス（セキュリティのため内部エラー詳細は隠蔽）
-        return {
-            "statusCode": 500,
-            "headers": COMMON_HEADERS,
-            "body": json.dumps(
-                {
-                    "error": "Internal server error",
-                    "message": "処理中にエラーが発生しました",
-                },
-                ensure_ascii=False,
-            ),
-        }
     except Exception as e:
         logger.error("Unexpected error: %s", str(e))
-        # 予期しないエラーの場合も詳細は隠蔽
-        return {
-            "statusCode": 500,
-            "headers": COMMON_HEADERS,
-            "body": json.dumps(
-                {
-                    "error": "Internal server error",
-                    "message": "予期しないエラーが発生しました",
-                },
-                ensure_ascii=False,
-            ),
-        }
+        return create_error_response(
+            500, "Internal Server Error", "予期しないエラーが発生しました"
+        )
+
+
+def _handle_options_request() -> Dict[str, Any]:
+    """CORS プリフライトリクエストのハンドリング
+
+    Returns:
+        dict: CORSレスポンス
+    """
+    return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
+
+
+def _handle_error(error_message: str, status_code: int = 500) -> Dict[str, Any]:
+    """エラーレスポンスの生成（互換性のため残す）
+
+    Args:
+        error_message: エラーメッセージ
+        status_code: HTTPステータスコード
+
+    Returns:
+        dict: エラーレスポンス
+    """
+    logger.error(error_message)
+    return create_error_response(status_code, "Error", error_message)

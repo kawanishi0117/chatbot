@@ -13,11 +13,11 @@ import time
 import uuid
 from typing import Any, Dict, Optional, BinaryIO, Union
 
-# normalizerモジュールのインポート
+# 新しい共通モジュールのインポート
 try:
-    import normalizer
+    from common.message import UnifiedMessage
 except ImportError:
-    from . import normalizer
+    from .common.message import UnifiedMessage
 
 # ログ設定
 logger = logging.getLogger()
@@ -33,7 +33,7 @@ CHAT_ASSETS_BUCKET = os.environ.get("CHAT_ASSETS_BUCKET", "chat-assets-prod")
 TTL_SECONDS = int(os.environ.get("TTL_SECONDS", 86400))  # 24時間
 
 
-def save_message(message: normalizer.UnifiedMessage) -> Dict[str, Any]:
+def save_message(message: UnifiedMessage) -> Dict[str, Any]:
     """メッセージをDynamoDBに保存し、バイナリデータがあればS3に保存
 
     Args:
@@ -91,7 +91,7 @@ def save_message(message: normalizer.UnifiedMessage) -> Dict[str, Any]:
 
 
 def save_binary_to_s3(
-    message: normalizer.UnifiedMessage,
+    message: UnifiedMessage,
     binary_data: Union[bytes, BinaryIO],
     file_extension: Optional[str] = None,
 ) -> str:
@@ -206,10 +206,10 @@ def _get_content_type(extension: str) -> str:
 
 
 def process_binary_data(
-    message: normalizer.UnifiedMessage,
+    message: UnifiedMessage,
     binary_data: Optional[Union[str, bytes, BinaryIO]] = None,
     file_extension: Optional[str] = None,
-) -> normalizer.UnifiedMessage:
+) -> UnifiedMessage:
     """バイナリデータを処理し、S3 URIでメッセージを更新
 
     Args:
