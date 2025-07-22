@@ -1,69 +1,83 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: ChatRouter Lambda - Simple webhook handler
-
-# Global settings
-Globals:
-  Function:
-    Timeout: 30
-    MemorySize: 128
-    Runtime: python3.12
-
-# Parameters
-Parameters:
-  Version:
-    Type: String
-    Default: "1.0.0"
-    Description: "アプリケーションのバージョン"
-
-# Resources
 Resources:
   ChatRouterFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ./
       Handler: src/lambda_function.lambda_handler
-      Description: Simple webhook handler for chat routing
+      Runtime: python3.12
+      Timeout: 30
+      MemorySize: 256
       Environment:
         Variables:
-          VERSION: !Ref Version
+          VERSION: "1.0.0"
+          CHAT_HISTORY_TABLE: "ChatHistory-dev"
+          CHAT_ASSETS_BUCKET: "chat-history-assets-dev"
+          CHATBOT_SETTINGS_TABLE: "ChatbotSettingsDB-dev"
+          TTL_SECONDS: "86400"
+          SLACK_SIGNING_SECRET: ""
+          LINE_CHANNEL_SECRET: ""
+          TEAMS_SECRET: ""
+          CUSTOM_UI_SECRET: ""
       Events:
         HealthCheck:
-          Type: HttpApi
+          Type: Api
           Properties:
             Path: /health
             Method: GET
         TestEndpoint:
-          Type: HttpApi
+          Type: Api
           Properties:
             Path: /test
             Method: ANY
-        WebhookMessageHistory:
-          Type: HttpApi
+        WebhookCustomUI:
+          Type: Api
           Properties:
-            Path: /webhook/message-history
+            Path: /webhook/custom
             Method: POST
         WebhookLineBot:
-          Type: HttpApi
+          Type: Api
           Properties:
             Path: /webhook/line
             Method: POST
         WebhookSlackBot:
-          Type: HttpApi
+          Type: Api
           Properties:
             Path: /webhook/slack
             Method: POST
         WebhookTeamsBot:
-          Type: HttpApi
+          Type: Api
           Properties:
             Path: /webhook/teams
             Method: POST
-
-# Outputs
-Outputs:
-  ChatRouterFunctionArn:
-    Description: "ChatRouter Lambda function ARN"
-    Value: !GetAtt ChatRouterFunction.Arn
-  Version:
-    Description: "アプリケーションのバージョン"
-    Value: !Ref Version 
+        BotSettingsAPI:
+          Type: Api
+          Properties:
+            Path: /api/bots
+            Method: ANY
+        BotSettingsDetailAPI:
+          Type: Api
+          Properties:
+            Path: /api/bots/{botId}
+            Method: ANY
+        AuthRegisterAPI:
+          Type: Api
+          Properties:
+            Path: /api/auth/register
+            Method: POST
+        AuthLoginAPI:
+          Type: Api
+          Properties:
+            Path: /api/auth/login
+            Method: POST
+        AuthCurrentUserAPI:
+          Type: Api
+          Properties:
+            Path: /api/auth/me
+            Method: GET
+        AuthLogoutAPI:
+          Type: Api
+          Properties:
+            Path: /api/auth/logout
+            Method: POST 

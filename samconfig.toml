@@ -4,6 +4,12 @@ version = 0.1
 [default.build.parameters]
 parallel = true
 
+[default.local_start_api.parameters]
+warm_containers = "EAGER"
+skip_pull_image = true
+host = "0.0.0.0"
+port = 3000
+
 [default.deploy.parameters]
 stack_name = "chatbot-backend"
 s3_bucket = ""  # SAM CLI will create a bucket if not specified
@@ -18,6 +24,12 @@ parameter_overrides = [
 [dev]
 [dev.build.parameters]
 parallel = true
+
+[dev.local_start_api.parameters]
+warm_containers = "EAGER"
+skip_pull_image = true
+host = "0.0.0.0"
+port = 3000
 
 [dev.deploy.parameters]
 stack_name = "chatbot-backend-dev"

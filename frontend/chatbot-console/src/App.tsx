@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import BotSettingsPanel from './components/BotSettingsPanel';
 import GitHubPanel from './components/GitHubPanel';
 import Header from './components/Header';
 import Login from './components/Login';
@@ -7,13 +8,14 @@ import S3Panel from './components/S3Panel';
 import Sidebar from './components/Sidebar';
 import UserPanel from './components/UserPanel';
 import WebhookPanel from './components/WebhookPanel';
+import { api, getToken } from './services/api';
 import { AuthState, ChatbotConfig } from './types';
 
 function App() {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
-    isLoading: false
+    isLoading: true
   });
 
   const [chatbots, setChatbots] = useState<ChatbotConfig[]>([]);
@@ -21,70 +23,112 @@ function App() {
   const [currentView, setCurrentView] = useState('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // デモ用のチャットボットデータを初期化
+  // 初期化時にトークンをチェック
   useEffect(() => {
-    if (authState.isAuthenticated && chatbots.length === 0) {
-      const mockChatbots: ChatbotConfig[] = [
-        {
-          id: '1',
-          name: 'カスタマーサポートボット',
-          description: '製品に関する質問に答えるチャットボット',
-          githubRepo: 'company/customer-support-docs',
-          s3Folder: 's3://chatbot-bucket/customer-support/',
-          isActive: true,
-          createdAt: '2024-01-15T10:30:00Z',
-          updatedAt: '2024-01-15T10:30:00Z'
-        },
-        {
-          id: '2',
-          name: 'API ドキュメンテーションボット',
-          description: 'API仕様に関する質問に答えるチャットボット',
-          githubRepo: 'company/api-documentation',
-          s3Folder: 's3://chatbot-bucket/api-docs/',
-          isActive: false,
-          createdAt: '2024-01-14T16:20:00Z',
-          updatedAt: '2024-01-14T16:20:00Z'
-        },
-        {
-          id: '3',
-          name: '社内ナレッジボット',
-          description: '社内文書とFAQに基づくチャットボット',
-          githubRepo: '',
-          s3Folder: 's3://chatbot-bucket/internal-docs/',
-          isActive: true,
-          createdAt: '2024-01-13T09:15:00Z',
-          updatedAt: '2024-01-13T09:15:00Z'
+    const checkAuth = async () => {
+      const token = getToken();
+      if (token) {
+        try {
+          const user = await api.getCurrentUser();
+          setAuthState({
+            user: {
+              id: user.userId,
+              email: user.email,
+              name: user.name,
+              role: user.role as 'user' | 'admin',
+              createdAt: new Date(user.createdAt).toISOString(),
+              updatedAt: new Date(user.updatedAt).toISOString()
+            },
+            isAuthenticated: true,
+            isLoading: false
+          });
+        } catch (error) {
+          // トークンが無効な場合
+          api.logout();
+          setAuthState({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false
+          });
         }
-      ];
-      setChatbots(mockChatbots);
-      setSelectedChatbot(mockChatbots[0]);
-    }
-  }, [authState.isAuthenticated, chatbots.length]);
+      } else {
+        setAuthState({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false
+        });
+      }
+    };
+    
+    checkAuth();
+  }, []);
 
-  const handleLogin = (email: string, _password: string) => {
-    // デモ用のログイン処理
-    setAuthState({
-      user: {
-        id: '1',
-        email,
-        name: email.split('@')[0],
-        role: 'admin',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      isAuthenticated: true,
-      isLoading: false
-    });
+  // チャットボットデータを取得
+  useEffect(() => {
+    const fetchBots = async () => {
+      if (authState.isAuthenticated && authState.user) {
+        try {
+          const response = await api.getBots();
+          const botList = response.bots.map(bot => ({
+            id: bot.botId,
+            name: bot.botName,
+            description: bot.description,
+            githubRepo: '',  // これらは別途管理
+            s3Folder: '',
+            isActive: bot.isActive,
+            createdAt: new Date(bot.createdAt).toISOString(),
+            updatedAt: new Date(bot.updatedAt).toISOString()
+          }));
+          setChatbots(botList);
+          if (botList.length > 0) {
+            setSelectedChatbot(botList[0]);
+          }
+        } catch (error) {
+          console.error('Failed to fetch bots:', error);
+        }
+      }
+    };
+    
+    fetchBots();
+  }, [authState.isAuthenticated, authState.user]);
+
+  const handleLogin = async (_email: string, _password: string) => {
+    // Login コンポーネント内で既にAPIを呼び出しているので、
+    // ここではユーザー情報を再取得
+    try {
+      const user = await api.getCurrentUser();
+      setAuthState({
+        user: {
+          id: user.userId,
+          email: user.email,
+          name: user.name,
+          role: user.role as 'user' | 'admin',
+          createdAt: new Date(user.createdAt).toISOString(),
+          updatedAt: new Date(user.updatedAt).toISOString()
+        },
+        isAuthenticated: true,
+        isLoading: false
+      });
+    } catch (error) {
+      console.error('Failed to get user info:', error);
+    }
   };
 
-  const handleLogout = () => {
-    setAuthState({
-      user: null,
-      isAuthenticated: false,
-      isLoading: false
-    });
-    setSelectedChatbot(null);
-    setCurrentView('overview');
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setAuthState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false
+      });
+      setChatbots([]);
+      setSelectedChatbot(null);
+      setCurrentView('overview');
+    }
   };
 
   const handleSelectChatbot = (chatbot: ChatbotConfig | null) => {
@@ -142,6 +186,15 @@ function App() {
   };
 
   const renderCurrentView = () => {
+    // ボット設定パネルは選択されたチャットボットに関係なく表示
+    if (currentView === 'bot-settings') {
+      return (
+        <BotSettingsPanel
+          currentUserId={authState.user?.id || 'anonymous'}
+        />
+      );
+    }
+
     if (!selectedChatbot) {
       return (
         <div className="flex-1 flex items-center justify-center text-gray-500">
@@ -209,6 +262,14 @@ function App() {
         );
     }
   };
+
+  if (authState.isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   if (!authState.isAuthenticated) {
     return <Login onLogin={handleLogin} />;
