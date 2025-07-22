@@ -1,0 +1,13 @@
+# .github/config.yml
+welcome:
+  newIssueWelcomeComment: >
+    🎉 はじめまして！Issueをありがとうございます 🙏
+    メンテナが順次対応しますので、少々お待ちください。
+  
+  newPRWelcomeComment: >
+    🚀 初めてのPull Requestありがとうございます！
+    チェック＆レビューを順番に行います 💪
+  
+  firstPRMergeComment: >
+    🥳 初めてのPRがマージされました！ありがとうございます！
+    またの貢献もぜひお待ちしてます 🙌

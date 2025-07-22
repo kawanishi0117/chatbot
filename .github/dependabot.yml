@@ -1,0 +1,6 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/" # package.json のある場所
+    schedule:
+      interval: "weekly"  # daily / weekly / monthly から選べる
