@@ -13,7 +13,7 @@ Globals:
         STAGE: !Ref Stage
         LOG_LEVEL: INFO
 
-# パラメータ
+  # Parameters
 Parameters:
   Stage:
     Type: String
@@ -43,6 +43,12 @@ Parameters:
     Default: ""
     NoEcho: true
     Description: Teams webhook secret
+    
+  CustomUISecret:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: Custom UI webhook secret
     
   GithubAppKey:
     Type: String
@@ -83,13 +89,16 @@ Resources:
       Environment:
         Variables:
           BEDROCK_MODEL_ID: !Ref BedrockModelId
-          SESSION_TABLE_NAME: !Ref SessionLogTable
+          CHAT_HISTORY_TABLE: !Ref ChatHistoryTable
+          CHAT_ASSETS_BUCKET: !Ref ChatAssetsBucket
           KNOWLEDGE_TABLE_NAME: !Ref KnowledgeVectorTable
           SLACK_SIGNING_SECRET: !Ref SlackSigningSecret
           LINE_CHANNEL_SECRET: !Ref LineChannelSecret
           TEAMS_SECRET: !Ref TeamsSecret
+          CUSTOM_UI_SECRET: !Ref CustomUISecret
           GITHUB_APP_KEY: !Ref GithubAppKey
           COMMAND_LANG_MAP: '{"ask":["ask","質問"],"investigate":["investigate","調査"],"clear":["clear","クリア"],"help":["help","ヘルプ"]}'
+          TTL_SECONDS: '86400'
       Events:
         # Webhook endpoints
         SlackWebhook:
@@ -110,6 +119,12 @@ Resources:
             ApiId: !Ref ChatbotApi
             Method: POST
             Path: /webhook/teams
+        CustomWebhook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ChatbotApi
+            Method: POST
+            Path: /webhook/custom
         # Test endpoints
         HealthCheck:
           Type: HttpApi
@@ -125,9 +140,11 @@ Resources:
             Path: /test
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref SessionLogTable
+            TableName: !Ref ChatHistoryTable
         - DynamoDBCrudPolicy:
             TableName: !Ref KnowledgeVectorTable
+        - S3CrudPolicy:
+            BucketName: !Ref ChatAssetsBucket
         - Version: '2012-10-17'
           Statement:
             - Effect: Allow
@@ -145,20 +162,20 @@ Resources:
               Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:chatbot/*'
 
   # DynamoDB Tables
-  SessionLogTable:
+  ChatHistoryTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub '${Stage}-chatbot-session-log'
+      TableName: !Sub '${Stage}-ChatHistory'
       BillingMode: ON_DEMAND
       AttributeDefinitions:
-        - AttributeName: session_id
+        - AttributeName: PK
           AttributeType: S
-        - AttributeName: timestamp
+        - AttributeName: SK
           AttributeType: N
       KeySchema:
-        - AttributeName: session_id
+        - AttributeName: PK
           KeyType: HASH
-        - AttributeName: timestamp
+        - AttributeName: SK
           KeyType: RANGE
       TimeToLiveSpecification:
         AttributeName: ttl
@@ -190,7 +207,40 @@ Resources:
         - Key: Stage
           Value: !Ref Stage
 
-  # EventBridge Custom Bus (for async processing)
+  # S3 Bucket for chat assets
+  ChatAssetsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${Stage}-chat-assets'
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireAfter1Day
+            Status: Enabled
+            ExpirationInDays: 1
+            Prefix: slack/
+          - Id: ExpireAfter1DayTeams
+            Status: Enabled
+            ExpirationInDays: 1
+            Prefix: teams/
+          - Id: ExpireAfter1DayLine
+            Status: Enabled
+            ExpirationInDays: 1
+            Prefix: line/
+          - Id: ExpireAfter1DayCustom
+            Status: Enabled
+            ExpirationInDays: 1
+            Prefix: custom/
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Project
+          Value: Chatbot
+        - Key: Stage
+          Value: !Ref Stage
+
+# EventBridge Custom Bus (for async processing)
   ChatbotEventBus:
     Type: AWS::Events::EventBus
     Properties:
@@ -215,11 +265,17 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-chat-router-arn"
 
-  SessionLogTableName:
-    Description: "Session Log DynamoDB Table Name"
-    Value: !Ref SessionLogTable
+  ChatHistoryTableName:
+    Description: "Chat History DynamoDB Table Name"
+    Value: !Ref ChatHistoryTable
     Export:
-      Name: !Sub "${AWS::StackName}-session-table"
+      Name: !Sub "${AWS::StackName}-chat-history-table"
+
+  ChatAssetsBucketName:
+    Description: "Chat Assets S3 Bucket Name"
+    Value: !Ref ChatAssetsBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-chat-assets-bucket"
 
   KnowledgeVectorTableName:
     Description: "Knowledge Vector DynamoDB Table Name"
