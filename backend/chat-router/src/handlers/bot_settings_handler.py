@@ -119,8 +119,9 @@ class BotSettingsHandler:
             current_time = int(time.time() * 1000)  # ミリ秒
 
             bot_data = {
-                "PK": bot_id,
+                "PK": f"BOT#{bot_id}",
                 "SK": "CONFIG",
+                "botId": bot_id,
                 "botName": data["botName"],
                 "description": data.get("description", ""),
                 "creatorId": data["creatorId"],
@@ -180,8 +181,14 @@ class BotSettingsHandler:
             # レスポンス形式を調整
             bot_list = []
             for item in items:
+                # PKから実際のbot_idを抽出（BOT#プレフィックスを除去）
+                bot_id = (
+                    item["PK"].replace("BOT#", "")
+                    if item["PK"].startswith("BOT#")
+                    else item["PK"]
+                )
                 bot_data = {
-                    "botId": item["PK"],
+                    "botId": item.get("botId", bot_id),
                     "botName": item["botName"],
                     "description": item.get("description", ""),
                     "creatorId": item["creatorId"],
@@ -221,14 +228,20 @@ class BotSettingsHandler:
                 )
 
             # DynamoDBから取得
-            response = table.get_item(Key={"PK": bot_id, "SK": "CONFIG"})
+            response = table.get_item(Key={"PK": f"BOT#{bot_id}", "SK": "CONFIG"})
 
             if "Item" not in response:
                 return create_error_response(404, "Not Found", "ボットが見つかりません")
 
             item = response["Item"]
+            # PKから実際のbot_idを抽出（BOT#プレフィックスを除去）
+            bot_id_from_pk = (
+                item["PK"].replace("BOT#", "")
+                if item["PK"].startswith("BOT#")
+                else item["PK"]
+            )
             bot_data = {
-                "botId": item["PK"],
+                "botId": item.get("botId", bot_id_from_pk),
                 "botName": item["botName"],
                 "description": item.get("description", ""),
                 "creatorId": item["creatorId"],
@@ -281,7 +294,9 @@ class BotSettingsHandler:
                 )
 
             # 現在のアイテムの存在確認
-            current_response = table.get_item(Key={"PK": bot_id, "SK": "CONFIG"})
+            current_response = table.get_item(
+                Key={"PK": f"BOT#{bot_id}", "SK": "CONFIG"}
+            )
             if "Item" not in current_response:
                 return create_error_response(404, "Not Found", "ボットが見つかりません")
 
@@ -303,7 +318,7 @@ class BotSettingsHandler:
 
             # DynamoDBのアップデート実行
             response = table.update_item(
-                Key={"PK": bot_id, "SK": "CONFIG"},
+                Key={"PK": f"BOT#{bot_id}", "SK": "CONFIG"},
                 UpdateExpression=update_expression,
                 ExpressionAttributeValues=expression_values,
                 ReturnValues="ALL_NEW",
@@ -311,8 +326,14 @@ class BotSettingsHandler:
 
             # レスポンス形式を調整
             updated_item = response["Attributes"]
+            # PKから実際のbot_idを抽出（BOT#プレフィックスを除去）
+            bot_id_from_pk = (
+                updated_item["PK"].replace("BOT#", "")
+                if updated_item["PK"].startswith("BOT#")
+                else updated_item["PK"]
+            )
             bot_data = {
-                "botId": updated_item["PK"],
+                "botId": updated_item.get("botId", bot_id_from_pk),
                 "botName": updated_item["botName"],
                 "description": updated_item.get("description", ""),
                 "creatorId": updated_item["creatorId"],
@@ -354,12 +375,12 @@ class BotSettingsHandler:
                 )
 
             # 削除前に存在確認
-            response = table.get_item(Key={"PK": bot_id, "SK": "CONFIG"})
+            response = table.get_item(Key={"PK": f"BOT#{bot_id}", "SK": "CONFIG"})
             if "Item" not in response:
                 return create_error_response(404, "Not Found", "ボットが見つかりません")
 
             # DynamoDBから削除
-            table.delete_item(Key={"PK": bot_id, "SK": "CONFIG"})
+            table.delete_item(Key={"PK": f"BOT#{bot_id}", "SK": "CONFIG"})
 
             logger.info(f"Bot deleted successfully: {bot_id}")
             return create_success_response(

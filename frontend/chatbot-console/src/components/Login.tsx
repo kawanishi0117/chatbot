@@ -1,26 +1,51 @@
 import { Eye, EyeOff, Settings, Shield } from 'lucide-react';
 import React, { useState } from 'react';
+import { api } from '../services/api';
 
 interface LoginProps {
   onLogin: (email: string, password: string) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
     
-    // デモ用の認証処理
-    setTimeout(() => {
+    try {
+      if (isRegisterMode) {
+        // パスワード確認
+        if (password !== confirmPassword) {
+          setError('パスワードが一致しません');
+          setIsLoading(false);
+          return;
+        }
+        
+        // ユーザー登録
+        await api.register(email, password, name);
+        // 登録後、自動的にログイン
+        await api.login(email, password);
+      } else {
+        // ログイン
+        await api.login(email, password);
+      }
+      
       onLogin(email, password);
+    } catch (err: any) {
+      setError(err.message || 'エラーが発生しました');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -35,9 +60,36 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <p className="text-gray-600">管理者ダッシュボードにログイン</p>
         </div>
 
-        {/* ログインフォーム */}
+        {/* ログイン/登録フォーム */}
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            {isRegisterMode ? '新規登録' : 'ログイン'}
+          </h2>
+          
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+              {error}
+            </div>
+          )}
+        
           <form onSubmit={handleSubmit} className="space-y-6">
+            {isRegisterMode && (
+              <div>
+                <label htmlFor="name" className="block text-sm font-semibold text-gray-700 mb-2">
+                  お名前
+                </label>
+                <input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                  placeholder="山田 太郎"
+                />
+              </div>
+            )}
+            
             <div>
               <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
                 メールアドレス
@@ -81,6 +133,26 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               </div>
             </div>
 
+            {isRegisterMode && (
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-semibold text-gray-700 mb-2">
+                  パスワード（確認）
+                </label>
+                <div className="relative">
+                  <input
+                    id="confirmPassword"
+                    type={showPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                    placeholder="パスワードを再入力"
+                  />
+                </div>
+              </div>
+            )}
+
+            {!isRegisterMode && (
             <div className="flex items-center justify-between">
               <label className="flex items-center">
                 <input
@@ -98,6 +170,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 パスワードを忘れた方
               </button>
             </div>
+            )}
 
             <button
               type="submit"
@@ -107,12 +180,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               {isLoading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  ログイン中...
+                  {isRegisterMode ? '登録中...' : 'ログイン中...'}
                 </>
               ) : (
                 <>
                   <Shield className="w-4 h-4 mr-2" />
-                  管理者ログイン
+                  {isRegisterMode ? '新規登録' : '管理者ログイン'}
                 </>
               )}
             </button>
@@ -120,27 +193,41 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
-              アカウントをお持ちでない方は{' '}
-              <button className="text-blue-600 hover:text-blue-500 font-medium transition-colors">
-                管理者にお問い合わせください
-              </button>
+              {isRegisterMode ? (
+                <>
+                  既にアカウントをお持ちの方は{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsRegisterMode(false);
+                      setError('');
+                      setConfirmPassword('');
+                    }}
+                    className="text-blue-600 hover:text-blue-500 font-medium transition-colors"
+                  >
+                    ログイン
+                  </button>
+                </>
+              ) : (
+                <>
+                  アカウントをお持ちでない方は{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsRegisterMode(true);
+                      setError('');
+                    }}
+                    className="text-blue-600 hover:text-blue-500 font-medium transition-colors"
+                  >
+                    新規登録
+                  </button>
+                </>
+              )}
             </p>
           </div>
         </div>
 
-        {/* デモ情報 */}
-        <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <Shield className="h-5 w-5 text-amber-400" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-amber-800">
-                <strong>デモ用:</strong> 任意のメールアドレスとパスワードでログインできます
-              </p>
-            </div>
-          </div>
-        </div>
+
       </div>
     </div>
   );

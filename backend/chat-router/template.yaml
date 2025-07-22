@@ -60,4 +60,24 @@ Resources:
           Type: Api
           Properties:
             Path: /api/bots/{botId}
-            Method: ANY 
+            Method: ANY
+        AuthRegisterAPI:
+          Type: Api
+          Properties:
+            Path: /api/auth/register
+            Method: POST
+        AuthLoginAPI:
+          Type: Api
+          Properties:
+            Path: /api/auth/login
+            Method: POST
+        AuthCurrentUserAPI:
+          Type: Api
+          Properties:
+            Path: /api/auth/me
+            Method: GET
+        AuthLogoutAPI:
+          Type: Api
+          Properties:
+            Path: /api/auth/logout
+            Method: POST 

@@ -18,6 +18,11 @@ export default defineConfig({
             console.log('Proxy error:', err);
           });
         }
+      },
+      '/webhook': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        secure: false
       }
     }
   }

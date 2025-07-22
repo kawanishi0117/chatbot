@@ -1,25 +1,50 @@
-import React, { useState } from 'react';
 import { Eye, EyeOff, MessageSquare } from 'lucide-react';
+import React, { useState } from 'react';
+import { api } from '../services/api';
 
 interface LoginProps {
   onLogin: (email: string, password: string) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
     
-    // デモ用の認証処理
-    setTimeout(() => {
+    try {
+      if (isRegisterMode) {
+        // パスワード確認
+        if (password !== confirmPassword) {
+          setError('パスワードが一致しません');
+          setIsLoading(false);
+          return;
+        }
+        
+        // ユーザー登録
+        await api.register(email, password, name);
+        // 登録後、自動的にログイン
+        await api.login(email, password);
+      } else {
+        // ログイン
+        await api.login(email, password);
+      }
+      
       onLogin(email, password);
+    } catch (err: any) {
+      setError(err.message || 'エラーが発生しました');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -34,9 +59,36 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <p className="text-gray-600">あなたのAIアシスタントにログイン</p>
         </div>
 
-        {/* ログインフォーム */}
+        {/* ログイン/登録フォーム */}
         <div className="bg-white rounded-lg shadow-xl p-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            {isRegisterMode ? '新規登録' : 'ログイン'}
+          </h2>
+          
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+              {error}
+            </div>
+          )}
+          
           <form onSubmit={handleSubmit} className="space-y-6">
+            {isRegisterMode && (
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                  お名前
+                </label>
+                <input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  placeholder="山田 太郎"
+                />
+              </div>
+            )}
+            
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 メールアドレス
@@ -80,18 +132,36 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <span className="ml-2 text-sm text-gray-600">ログイン状態を保持</span>
-              </label>
-              <a href="#" className="text-sm text-blue-600 hover:text-blue-500">
-                パスワードを忘れた方
-              </a>
-            </div>
+            {isRegisterMode && (
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                  パスワード（確認）
+                </label>
+                <div className="relative">
+                  <input
+                    id="confirmPassword"
+                    type={showPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    placeholder="パスワードを再入力"
+                  />
+                </div>
+              </div>
+            )}
+
+            {!isRegisterMode && (
+              <div className="flex items-center justify-between">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <span className="ml-2 text-sm text-gray-600">ログイン状態を保持</span>
+                </label>
+              </div>
+            )}
 
             <button
               type="submit"
@@ -101,29 +171,48 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               {isLoading ? (
                 <div className="flex items-center">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  ログイン中...
+                  {isRegisterMode ? '登録中...' : 'ログイン中...'}
                 </div>
               ) : (
-                'ログイン'
+                isRegisterMode ? '新規登録' : 'ログイン'
               )}
             </button>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
-              アカウントをお持ちでない方は{' '}
-              <a href="#" className="text-blue-600 hover:text-blue-500 font-medium">
-                こちらから登録
-              </a>
+              {isRegisterMode ? (
+                <>
+                  既にアカウントをお持ちの方は{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsRegisterMode(false);
+                      setError('');
+                      setConfirmPassword('');
+                    }}
+                    className="text-blue-600 hover:text-blue-500 font-medium"
+                  >
+                    ログイン
+                  </button>
+                </>
+              ) : (
+                <>
+                  アカウントをお持ちでない方は{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsRegisterMode(true);
+                      setError('');
+                    }}
+                    className="text-blue-600 hover:text-blue-500 font-medium"
+                  >
+                    新規登録
+                  </button>
+                </>
+              )}
             </p>
           </div>
-        </div>
-
-        {/* デモ情報 */}
-        <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p className="text-sm text-yellow-800">
-            <strong>デモ用:</strong> 任意のメールアドレスとパスワードでログインできます
-          </p>
         </div>
       </div>
     </div>

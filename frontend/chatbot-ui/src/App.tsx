@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ChatArea from './components/ChatArea';
 import Header from './components/Header';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
 import { AuthState, Chat, Message } from './types';
+import { api, getToken } from './services/api';
 
 // デモ用のAI応答生成関数
 const generateAIResponse = (userMessage: string): string => {
@@ -40,7 +41,7 @@ function App() {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
-    isLoading: false
+    isLoading: true
   });
 
   const [chats, setChats] = useState<Chat[]>([]);
@@ -51,28 +52,78 @@ function App() {
   // 現在のチャットを取得
   const currentChat = chats.find(chat => chat.id === currentChatId) || null;
 
+  // 初期化時にトークンをチェック
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = getToken();
+      if (token) {
+        try {
+          const user = await api.getCurrentUser();
+          setAuthState({
+            user: {
+              id: user.userId,
+              email: user.email,
+              name: user.name
+            },
+            isAuthenticated: true,
+            isLoading: false
+          });
+        } catch (error) {
+          // トークンが無効な場合
+          api.logout();
+          setAuthState({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false
+          });
+        }
+      } else {
+        setAuthState({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false
+        });
+      }
+    };
+    
+    checkAuth();
+  }, []);
+
   // ログイン処理
-  const handleLogin = (email: string, password: string) => {
-    setAuthState({
-      user: {
-        id: '1',
-        email,
-        name: email.split('@')[0] || 'ユーザー'
-      },
-      isAuthenticated: true,
-      isLoading: false
-    });
+  const handleLogin = async (_email: string, _password: string) => {
+    // Login コンポーネント内で既にAPIを呼び出しているので、
+    // ここではユーザー情報を再取得
+    try {
+      const user = await api.getCurrentUser();
+      setAuthState({
+        user: {
+          id: user.userId,
+          email: user.email,
+          name: user.name
+        },
+        isAuthenticated: true,
+        isLoading: false
+      });
+    } catch (error) {
+      console.error('Failed to get user info:', error);
+    }
   };
 
   // ログアウト処理
-  const handleLogout = () => {
-    setAuthState({
-      user: null,
-      isAuthenticated: false,
-      isLoading: false
-    });
-    setChats([]);
-    setCurrentChatId(null);
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setAuthState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false
+      });
+      setChats([]);
+      setCurrentChatId(null);
+    }
   };
 
   // 新しいチャット作成
@@ -172,6 +223,15 @@ function App() {
   const handleToggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
+
+  // ローディング中の表示
+  if (authState.isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   // ログインしていない場合はログイン画面を表示
   if (!authState.isAuthenticated) {
