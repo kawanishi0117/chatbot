@@ -8,12 +8,7 @@ import os
 from typing import Any, Dict
 
 # Lambda実行環境でのモジュールインポートを確保
-try:
-    # 直接インポート（Lambdaランタイムでは同じディレクトリ内のファイル）
-    import webhook_handler
-except ImportError:
-    # ローカル開発環境での相対インポート
-    from . import webhook_handler
+from . import webhook_handler
 
 # ログ設定
 logger = logging.getLogger()
@@ -36,7 +31,7 @@ CORS_HEADERS: Dict[str, str] = {
 }
 
 
-def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
+def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     ChatRouter Lambda - ウェブフック経由の処理全般を担当
 
@@ -47,6 +42,13 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     - Quick ACK応答（<100ms）
     - 回答生成とチャット処理
     - EventBridge連携による非同期処理トリガー
+
+    Args:
+        event: Lambda event オブジェクト
+        context: Lambda context オブジェクト
+
+    Returns:
+        statusCode、headers、bodyを含む辞書
     """
     try:
         # バージョン情報をログ出力
@@ -66,7 +68,8 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         if raw_body:
             try:
                 body = json.loads(raw_body)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                logger.warning("Failed to parse JSON body: %s", str(e))
                 body = raw_body
         else:
             body = ""
@@ -86,7 +89,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             # デバッグ用ログ出力
             logger.info("Health check endpoint accessed")
             logger.info("VERSION: %s", VERSION)
-            print("-----" + VERSION)
+            print("-----" + str(VERSION))
             response_data["status"] = "healthy"
             response_data["message"] = "Service is running properly"
             response_data["version"] = VERSION
@@ -117,12 +120,29 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     except (KeyError, TypeError, ValueError) as e:
         logger.error("Error processing request: %s", str(e))
 
-        # エラーレスポンス
+        # エラーレスポンス（セキュリティのため内部エラー詳細は隠蔽）
         return {
             "statusCode": 500,
             "headers": COMMON_HEADERS,
             "body": json.dumps(
-                {"error": "Internal server error", "message": str(e)},
+                {
+                    "error": "Internal server error",
+                    "message": "処理中にエラーが発生しました",
+                },
+                ensure_ascii=False,
+            ),
+        }
+    except Exception as e:
+        logger.error("Unexpected error: %s", str(e))
+        # 予期しないエラーの場合も詳細は隠蔽
+        return {
+            "statusCode": 500,
+            "headers": COMMON_HEADERS,
+            "body": json.dumps(
+                {
+                    "error": "Internal server error",
+                    "message": "予期しないエラーが発生しました",
+                },
                 ensure_ascii=False,
             ),
         }

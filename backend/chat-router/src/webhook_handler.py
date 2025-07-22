@@ -122,7 +122,7 @@ def _handle_custom_webhook(body: Any, event: dict) -> dict:
             "message": "Custom UI webhook processed successfully",
             "timestamp": datetime.utcnow().isoformat(),
             "roomKey": message.room_key,
-            "messageTs": message.ts
+            "messageTs": message.ts,
         }
 
         return _create_success_response(response_data)
@@ -150,18 +150,22 @@ def _handle_line_webhook(body: Any, event: dict) -> dict:
         if LINE_CHANNEL_SECRET:
             signature = event.get("headers", {}).get("x-line-signature", "")
             if not _verify_line_signature(json.dumps(body), signature):
-                return _create_error_response(401, "Unauthorized", "Invalid LINE signature")
+                return _create_error_response(
+                    401, "Unauthorized", "Invalid LINE signature"
+                )
 
         # メッセージの正規化
         message = normalizer.normalize_line_message(body)
         if not message:
             # LINEの場合、メッセージイベント以外も正常に処理する必要がある
-            return _create_success_response({
-                "status": "ignored",
-                "platform": "line",
-                "message": "Non-message LINE event ignored",
-                "timestamp": datetime.utcnow().isoformat()
-            })
+            return _create_success_response(
+                {
+                    "status": "ignored",
+                    "platform": "line",
+                    "message": "Non-message LINE event ignored",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
 
         # メッセージの保存
         result = storage.save_message(message)
@@ -175,7 +179,7 @@ def _handle_line_webhook(body: Any, event: dict) -> dict:
             "message": "LINE webhook processed successfully",
             "timestamp": datetime.utcnow().isoformat(),
             "roomKey": message.room_key,
-            "messageTs": message.ts
+            "messageTs": message.ts,
         }
 
         return _create_success_response(response_data)
@@ -205,24 +209,26 @@ def _handle_slack_webhook(body: Any, event: dict) -> dict:
             signature = event.get("headers", {}).get("x-slack-signature", "")
             raw_body = event.get("body", "")  # 署名検証には生のボディが必要
             if not _verify_slack_signature(raw_body, timestamp, signature):
-                return _create_error_response(401, "Unauthorized", "Invalid Slack signature")
+                return _create_error_response(
+                    401, "Unauthorized", "Invalid Slack signature"
+                )
 
         # Slackのチャレンジリクエスト対応
         if body.get("type") == "url_verification":
-            return _create_success_response({
-                "challenge": body.get("challenge", "")
-            })
+            return _create_success_response({"challenge": body.get("challenge", "")})
 
         # メッセージの正規化
         message = normalizer.normalize_slack_message(body)
         if not message:
             # Slackの場合、メッセージイベント以外も正常に処理する必要がある
-            return _create_success_response({
-                "status": "ignored",
-                "platform": "slack",
-                "message": "Non-message Slack event ignored",
-                "timestamp": datetime.utcnow().isoformat()
-            })
+            return _create_success_response(
+                {
+                    "status": "ignored",
+                    "platform": "slack",
+                    "message": "Non-message Slack event ignored",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
 
         # メッセージの保存
         result = storage.save_message(message)
@@ -236,7 +242,7 @@ def _handle_slack_webhook(body: Any, event: dict) -> dict:
             "message": "Slack webhook processed successfully",
             "timestamp": datetime.utcnow().isoformat(),
             "roomKey": message.room_key,
-            "messageTs": message.ts
+            "messageTs": message.ts,
         }
 
         return _create_success_response(response_data)
@@ -264,18 +270,22 @@ def _handle_teams_webhook(body: Any, event: dict) -> dict:
         if TEAMS_SECRET:
             auth_header = event.get("headers", {}).get("authorization", "")
             if not _verify_teams_auth(auth_header):
-                return _create_error_response(401, "Unauthorized", "Invalid Teams authentication")
+                return _create_error_response(
+                    401, "Unauthorized", "Invalid Teams authentication"
+                )
 
         # メッセージの正規化
         message = normalizer.normalize_teams_message(body)
         if not message:
             # Teamsの場合、メッセージアクティビティ以外も正常に処理する必要がある
-            return _create_success_response({
-                "status": "ignored",
-                "platform": "teams",
-                "message": "Non-message Teams activity ignored",
-                "timestamp": datetime.utcnow().isoformat()
-            })
+            return _create_success_response(
+                {
+                    "status": "ignored",
+                    "platform": "teams",
+                    "message": "Non-message Teams activity ignored",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
 
         # メッセージの保存
         result = storage.save_message(message)
@@ -289,7 +299,7 @@ def _handle_teams_webhook(body: Any, event: dict) -> dict:
             "message": "Teams webhook processed successfully",
             "timestamp": datetime.utcnow().isoformat(),
             "roomKey": message.room_key,
-            "messageTs": message.ts
+            "messageTs": message.ts,
         }
 
         return _create_success_response(response_data)
@@ -316,11 +326,12 @@ def _verify_slack_signature(body: str, timestamp: str, signature: str) -> bool:
 
     # 署名の検証
     base_string = f"v0:{timestamp}:{body}"
-    my_signature = "v0=" + hmac.new(
-        SLACK_SIGNING_SECRET.encode(),
-        base_string.encode(),
-        hashlib.sha256
-    ).hexdigest()
+    my_signature = (
+        "v0="
+        + hmac.new(
+            SLACK_SIGNING_SECRET.encode(), base_string.encode(), hashlib.sha256
+        ).hexdigest()
+    )
 
     return hmac.compare_digest(my_signature, signature)
 
@@ -341,9 +352,7 @@ def _verify_line_signature(body: str, signature: str) -> bool:
 
     # 署名の検証
     hash_value = hmac.new(
-        LINE_CHANNEL_SECRET.encode(),
-        body.encode(),
-        hashlib.sha256
+        LINE_CHANNEL_SECRET.encode(), body.encode(), hashlib.sha256
     ).digest()
     my_signature = base64.b64encode(hash_value).decode()
 
@@ -384,9 +393,7 @@ def _verify_custom_signature(body: str, signature: str) -> bool:
 
     # 署名の検証
     my_signature = hmac.new(
-        CUSTOM_UI_SECRET.encode(),
-        body.encode(),
-        hashlib.sha256
+        CUSTOM_UI_SECRET.encode(), body.encode(), hashlib.sha256
     ).hexdigest()
 
     return hmac.compare_digest(my_signature, signature)
