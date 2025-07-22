@@ -206,10 +206,11 @@ try {
     # SAM local API の起動
     Write-ColorText "🚀 Starting SAM local API..." "Yellow"
     Write-ColorText "💡 SAM local API will start on http://localhost:3000" "Yellow"
+    Write-ColorText "🔥 Warm containers enabled - Lambda will start faster!" "Yellow"
     
-    # バックグラウンドでSAM local start-apiを実行
+    # バックグラウンドでSAM local start-apiを実行（ウォームコンテナ有効化）
     $samJob = Start-Job -ScriptBlock {
-        sam local start-api --host 0.0.0.0 --port 3000
+        sam local start-api --host 0.0.0.0 --port 3000 --warm-containers EAGER
     }
     
     Write-ColorText "✅ SAM local API started in background (Job ID: $($samJob.Id))" "Green"
@@ -284,6 +285,7 @@ try {
         Write-ColorText "  • Clean up: .\start-project.ps1 -Clean" "White"
         Write-ColorText "  • Use Docker: .\start-project.ps1 -Docker" "White"
         Write-ColorText "  • Manual testing: Use the endpoints shown above" "White"
+        Write-ColorText "  • Warm containers provide faster Lambda response times!" "Green"
     }
 
     Write-ColorText "" ""
