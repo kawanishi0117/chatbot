@@ -1,60 +1,60 @@
-# Multi-Platform Chat Router
+# マルチプラットフォーム チャット ルータ
 
-This module implements a common pipeline for processing webhooks from multiple chat platforms (Slack, Microsoft Teams, LINE, and a custom UI) and storing messages in DynamoDB and binary data in S3.
+このモジュールは、複数のチャットプラットフォーム（Slack、Microsoft Teams、LINE、カスタムUI）からのWebhookを処理し、メッセージをDynamoDBに、バイナリデータをS3に保存するための共通パイプラインを実装します。
 
-## Architecture
+## アーキテクチャ
 
-The system follows a serverless architecture using AWS services:
+このシステムはAWSサービスを使用したサーバーレスアーキテクチャに従っています：
 
-1. **API Gateway (HTTP API)** - Receives webhook requests from different platforms
-2. **Lambda (Router)** - Routes requests to the appropriate handler
-3. **Lambda (Normalizer)** - Normalizes platform-specific data to a common format
-4. **Lambda (Saver)** - Saves normalized data to DynamoDB and binary data to S3
-5. **DynamoDB (ChatHistory)** - Stores text and metadata with TTL for 24-hour retention
-6. **S3 (chat-assets-prod)** - Stores binary data with lifecycle rules for 24-hour retention
+1. **API Gateway (HTTP API)** - 異なるプラットフォームからのWebhookリクエストを受信
+2. **Lambda (Router)** - リクエストを適切なハンドラーにルーティング
+3. **Lambda (Normalizer)** - プラットフォーム固有のデータを共通フォーマットに正規化
+4. **Lambda (Saver)** - 正規化されたデータをDynamoDBに、バイナリデータをS3に保存
+5. **DynamoDB (ChatHistory)** - 24時間保持のTTLを持つテキストとメタデータを保存
+6. **S3 (chat-assets-prod)** - 24時間保持のライフサイクルルールを持つバイナリデータを保存
 
-## Data Model
+## データモデル
 
-### Room Key Format
+### ルームキー形式
 
-Each platform has a unique room key format that includes the platform name:
+各プラットフォームはプラットフォーム名を含む一意のルームキー形式を持ちます：
 
-| Platform  | roomKey Format                      | Example                              |
-|-----------|------------------------------------|------------------------------------|
-| Slack     | `slack:{team_id}:{channel}`        | `slack:T0AAA:C123456`              |
-| Teams     | `teams:{tenantId}:{conversationId}` | `teams:72fabc:19:abc@thread.tacv2` |
-| LINE      | `line:{source.type}:{id}`          | `line:group:Ca56f946…`             |
-| Custom UI | `custom:{roomId}`                  | `custom:abc123`                    |
+| プラットフォーム | roomKey 形式                        | 例                                 |
+|------------------|------------------------------------|------------------------------------|
+| Slack            | `slack:{team_id}:{channel}`        | `slack:T0AAA:C123456`              |
+| Teams            | `teams:{tenantId}:{conversationId}` | `teams:72fabc:19:abc@thread.tacv2` |
+| LINE             | `line:{source.type}:{id}`          | `line:group:Ca56f946…`             |
+| カスタムUI       | `custom:{roomId}`                  | `custom:abc123`                    |
 
-### DynamoDB Schema
+### DynamoDBスキーマ
 
-The `ChatHistory` table has the following schema:
+`ChatHistory`テーブルは以下のスキーマを持ちます：
 
-| Attribute      | Type | Description                                |
+| 属性名         | 型   | 説明                                       |
 |----------------|------|--------------------------------------------|
 | **PK**         | `S`  | roomKey                                    |
-| **SK**         | `N`  | `ts` (Unix ms) - Sort key                  |
+| **SK**         | `N`  | `ts` (Unix ミリ秒) - ソートキー            |
 | `role`         | `S`  | `"user"` / `"assistant"`                   |
-| `text`         | `S`  | Message text content                       |
-| `contentType`  | `S`  | `"text"` / `"image"` / `"file"` / etc.     |
-| `s3Uri`        | `S`  | S3 URI for binary data (if applicable)     |
-| **ttl**        | `N`  | Expiration time (Unix seconds + 24 hours)  |
+| `text`         | `S`  | メッセージテキスト内容                     |
+| `contentType`  | `S`  | `"text"` / `"image"` / `"file"` / など     |
+| `s3Uri`        | `S`  | バイナリデータのS3 URI（該当する場合）      |
+| **ttl**        | `N`  | 有効期限時刻（Unix秒 + 24時間）             |
 
-### S3 Storage
+### S3ストレージ
 
-Binary data is stored in S3 with the following path format:
+バイナリデータは以下のパス形式でS3に保存されます：
 
 ```
 <platform>/<roomKey>/<ts>.<ext>
 ```
 
-Lifecycle rules are configured to automatically delete objects after 24 hours.
+ライフサイクルルールは24時間後にオブジェクトを自動的に削除するように設定されています。
 
-## Components
+## コンポーネント
 
-### 1. Normalizer
+### 1. ノーマライザー
 
-The normalizer module (`normalizer.py`) converts platform-specific webhook payloads to a common format:
+ノーマライザーモジュール（`normalizer.py`）は、プラットフォーム固有のWebhookペイロードを共通フォーマットに変換します：
 
 ```python
 message = UnifiedMessage(
@@ -69,31 +69,31 @@ message = UnifiedMessage(
 )
 ```
 
-### 2. Storage
+### 2. ストレージ
 
-The storage module (`storage.py`) handles storing messages in DynamoDB and binary data in S3:
+ストレージモジュール（`storage.py`）は、DynamoDBへのメッセージ保存とS3へのバイナリデータ保存を処理します：
 
 ```python
-# Save message to DynamoDB
+# DynamoDBにメッセージを保存
 result = storage.save_message(message)
 
-# Save binary data to S3
+# S3にバイナリデータを保存
 s3_uri = storage.save_binary_to_s3(message, binary_data, file_extension)
 
-# Get recent messages (last 3 exchanges = 6 messages)
+# 最近のメッセージを取得（最後の3回の交換 = 6メッセージ）
 messages = storage.get_recent_messages(room_key, limit=6)
 ```
 
-### 3. Webhook Handler
+### 3. Webhookハンドラー
 
-The webhook handler module (`webhook_handler.py`) processes webhook requests from different platforms:
+Webhookハンドラーモジュール（`webhook_handler.py`）は、異なるプラットフォームからのWebhookリクエストを処理します：
 
-- Verifies signatures for security
-- Normalizes messages using the normalizer
-- Saves messages and binary data using the storage module
-- Returns appropriate responses for each platform
+- セキュリティのために署名を検証
+- ノーマライザーを使用してメッセージを正規化
+- ストレージモジュールを使用してメッセージとバイナリデータを保存
+- 各プラットフォームに適切なレスポンスを返送
 
-## Usage
+## 使用方法
 
 ### Slack Webhook
 
@@ -151,7 +151,7 @@ X-Line-Signature: abcdef...
 }
 ```
 
-### Custom UI Webhook
+### カスタムUI Webhook
 
 ```
 POST /webhook/custom
@@ -169,28 +169,28 @@ X-Custom-Signature: abcdef...
 }
 ```
 
-## Retrieving Conversation History
+## 会話履歴の取得
 
-To retrieve the last 3 conversation exchanges (6 messages):
+最後の3回の会話交換（6メッセージ）を取得するには：
 
 ```python
 messages = storage.get_recent_messages(room_key, limit=6)
 ```
 
-The messages are returned in chronological order (oldest first).
+メッセージは時系列順（古いものから）で返されます。
 
-## Testing
+## テスト
 
-Run the tests using pytest:
+pytestを使用してテストを実行：
 
 ```bash
 cd backend/chat-router
 python -m pytest test_normalizer.py test_storage.py test_webhook_handler.py -v
 ```
 
-## Deployment
+## デプロイメント
 
-Deploy the system using AWS SAM:
+AWS SAMを使用してシステムをデプロイ：
 
 ```bash
 sam build --parallel
