@@ -1,15 +1,15 @@
 import {
-	AlertTriangle,
-	CheckCircle,
-	Copy,
-	Edit,
-	ExternalLink,
-	Eye,
-	EyeOff,
-	Plus,
-	Trash2,
-	Webhook,
-	XCircle
+    AlertTriangle,
+    CheckCircle,
+    Copy,
+    Edit,
+    ExternalLink,
+    Eye,
+    EyeOff,
+    Plus,
+    Trash2,
+    Webhook,
+    XCircle
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { ChatbotConfig, WebhookConfig } from '../types';
@@ -208,199 +208,198 @@ const WebhookPanel: React.FC<WebhookPanelProps> = ({ chatbot, onSave }) => {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* ヘッダー */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center space-x-3">
-            <Webhook className="w-8 h-8" />
-            <span>Webhook設定</span>
-          </h1>
-          <p className="text-gray-600 mt-1">
-            外部システムとの連携用Webhookを設定・管理します
-          </p>
+    <div className="h-full overflow-y-auto scrollbar-thin">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
+        {/* ヘッダー */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Webhook設定</h1>
+            <p className="text-gray-600 mt-1">
+              {chatbot.name} のWebhook設定を管理してください
+            </p>
+          </div>
+          
+          <button
+            onClick={() => setIsCreating(true)}
+            className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>新しいWebhook</span>
+          </button>
         </div>
 
-        <button
-          onClick={() => setIsCreating(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>新しいWebhook</span>
-        </button>
-      </div>
+        {/* Webhook一覧 */}
+        <div className="space-y-4">
+          {/* 新規作成フォーム */}
+          {isCreating && (
+            <WebhookForm
+              onSave={(webhookData) => {
+                const newWebhook: WebhookConfig = {
+                  id: Date.now().toString(),
+                  chatbotId: chatbot.id,
+                  ...webhookData,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                } as WebhookConfig;
+                setWebhooks(prev => [...prev, newWebhook]);
+                setIsCreating(false);
+              }}
+              onCancel={() => setIsCreating(false)}
+            />
+          )}
 
-      {/* 新規作成フォーム */}
-      {isCreating && (
-        <WebhookForm
-          onSave={(webhookData) => {
-            const newWebhook: WebhookConfig = {
-              id: Date.now().toString(),
-              chatbotId: chatbot.id,
-              ...webhookData,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            } as WebhookConfig;
-            setWebhooks(prev => [...prev, newWebhook]);
-            setIsCreating(false);
-          }}
-          onCancel={() => setIsCreating(false)}
-        />
-      )}
+          {/* 編集フォーム */}
+          {editingWebhook && (
+            <WebhookForm
+              webhook={editingWebhook}
+              onSave={(webhookData) => {
+                setWebhooks(prev => prev.map(w => 
+                  w.id === editingWebhook.id 
+                    ? { ...w, ...webhookData, updatedAt: new Date().toISOString() }
+                    : w
+                ));
+                setEditingWebhook(null);
+              }}
+              onCancel={() => setEditingWebhook(null)}
+            />
+          )}
 
-      {/* 編集フォーム */}
-      {editingWebhook && (
-        <WebhookForm
-          webhook={editingWebhook}
-          onSave={(webhookData) => {
-            setWebhooks(prev => prev.map(w => 
-              w.id === editingWebhook.id 
-                ? { ...w, ...webhookData, updatedAt: new Date().toISOString() }
-                : w
-            ));
-            setEditingWebhook(null);
-          }}
-          onCancel={() => setEditingWebhook(null)}
-        />
-      )}
-
-      {/* Webhookリスト */}
-      <div className="space-y-4">
-        {webhooks.map((webhook) => (
-          <div key={webhook.id} className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-3">
-                  <div className={`
-                    flex items-center justify-center w-10 h-10 rounded-lg
-                    ${webhook.isActive ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}
-                  `}>
-                    <Webhook className="w-5 h-5" />
+          {webhooks.map((webhook) => (
+            <div key={webhook.id} className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div className={`
+                      flex items-center justify-center w-10 h-10 rounded-lg
+                      ${webhook.isActive ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}
+                    `}>
+                      <Webhook className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{webhook.url}</h3>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <span className={`
+                          inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                          ${webhook.isActive 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                          }
+                        `}>
+                          {webhook.isActive ? 'アクティブ' : '停止中'}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          作成: {new Date(webhook.createdAt).toLocaleDateString('ja-JP')}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{webhook.url}</h3>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <span className={`
-                        inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                        ${webhook.isActive 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-gray-100 text-gray-800'
-                        }
-                      `}>
-                        {webhook.isActive ? 'アクティブ' : '停止中'}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        作成: {new Date(webhook.createdAt).toLocaleDateString('ja-JP')}
-                      </span>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">監視イベント</h4>
+                      <div className="flex flex-wrap gap-1">
+                        {webhook.events.map(eventId => {
+                          const event = availableEvents.find(e => e.id === eventId);
+                          return (
+                            <span key={eventId} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                              {event?.label || eventId}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">シークレットキー</h4>
+                      <div className="flex items-center space-x-2">
+                        <code className="flex-1 bg-gray-100 px-3 py-1 rounded text-sm font-mono">
+                          {showSecrets[webhook.id] ? webhook.secret : '••••••••••••••••'}
+                        </code>
+                        <button
+                          onClick={() => toggleSecret(webhook.id)}
+                          className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          {showSecrets[webhook.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                        <button
+                          onClick={() => copyToClipboard(webhook.secret)}
+                          className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">監視イベント</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {webhook.events.map(eventId => {
-                        const event = availableEvents.find(e => e.id === eventId);
-                        return (
-                          <span key={eventId} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
-                            {event?.label || eventId}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">シークレットキー</h4>
-                    <div className="flex items-center space-x-2">
-                      <code className="flex-1 bg-gray-100 px-3 py-1 rounded text-sm font-mono">
-                        {showSecrets[webhook.id] ? webhook.secret : '••••••••••••••••'}
-                      </code>
-                      <button
-                        onClick={() => toggleSecret(webhook.id)}
-                        className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        {showSecrets[webhook.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                      <button
-                        onClick={() => copyToClipboard(webhook.secret)}
-                        className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+                <div className="flex items-center space-x-2 ml-4">
+                  <a
+                    href={webhook.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                    title="URLを開く"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                  <button
+                    onClick={() => setEditingWebhook(webhook)}
+                    className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                    title="編集"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleToggleWebhook(webhook.id)}
+                    className={`p-2 transition-colors ${
+                      webhook.isActive 
+                        ? 'text-red-400 hover:text-red-600' 
+                        : 'text-green-400 hover:text-green-600'
+                    }`}
+                    title={webhook.isActive ? '無効にする' : '有効にする'}
+                  >
+                    {webhook.isActive ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                  </button>
+                  <button
+                    onClick={() => handleDeleteWebhook(webhook.id)}
+                    className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                    title="削除"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-              </div>
-
-              <div className="flex items-center space-x-2 ml-4">
-                <a
-                  href={webhook.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                  title="URLを開く"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-                <button
-                  onClick={() => setEditingWebhook(webhook)}
-                  className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
-                  title="編集"
-                >
-                  <Edit className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleToggleWebhook(webhook.id)}
-                  className={`p-2 transition-colors ${
-                    webhook.isActive 
-                      ? 'text-red-400 hover:text-red-600' 
-                      : 'text-green-400 hover:text-green-600'
-                  }`}
-                  title={webhook.isActive ? '無効にする' : '有効にする'}
-                >
-                  {webhook.isActive ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
-                </button>
-                <button
-                  onClick={() => handleDeleteWebhook(webhook.id)}
-                  className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                  title="削除"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {webhooks.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
-            <Webhook className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Webhookが設定されていません</h3>
-            <p className="text-gray-600 mb-4">外部システムとの連携を開始するには、Webhookを追加してください</p>
-            <button
-              onClick={() => setIsCreating(true)}
-              className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              <span>最初のWebhookを作成</span>
-            </button>
-          </div>
-        )}
-      </div>
+          {webhooks.length === 0 && (
+            <div className="text-center py-12 text-gray-500">
+              <Webhook className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Webhookが設定されていません</h3>
+              <p className="text-gray-600 mb-4">外部システムとの連携を開始するには、Webhookを追加してください</p>
+              <button
+                onClick={() => setIsCreating(true)}
+                className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span>最初のWebhookを作成</span>
+              </button>
+            </div>
+          )}
+        </div>
 
-      {/* 設定説明 */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-        <div className="flex items-start space-x-4">
-          <AlertTriangle className="w-6 h-6 text-blue-600 mt-1" />
-          <div>
-            <h3 className="font-semibold text-blue-900 mb-2">Webhookについて</h3>
-            <div className="text-sm text-blue-800 space-y-2">
-              <p>• Webhookを使用して、チャットボットのイベントを外部システムに通知できます</p>
-              <p>• HTTPSエンドポイントが必要です（HTTP非対応）</p>
-              <p>• シークレットキーを使用してリクエストの真正性を検証してください</p>
-              <p>• ペイロードはJSON形式で送信されます</p>
+        {/* 設定説明 */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+          <div className="flex items-start space-x-4">
+            <AlertTriangle className="w-6 h-6 text-blue-600 mt-1" />
+            <div>
+              <h3 className="font-semibold text-blue-900 mb-2">Webhookについて</h3>
+              <div className="text-sm text-blue-800 space-y-2">
+                <p>• Webhookを使用して、チャットボットのイベントを外部システムに通知できます</p>
+                <p>• HTTPSエンドポイントが必要です（HTTP非対応）</p>
+                <p>• シークレットキーを使用してリクエストの真正性を検証してください</p>
+                <p>• ペイロードはJSON形式で送信されます</p>
+              </div>
             </div>
           </div>
         </div>

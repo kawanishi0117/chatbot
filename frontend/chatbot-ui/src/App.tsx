@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import ChatArea from './components/ChatArea';
 import Header from './components/Header';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
-import { AuthState, Chat, Message } from './types';
 import { api, getToken } from './services/api';
+import { AuthState, Chat, Message } from './types';
 
 // デモ用のAI応答生成関数
 const generateAIResponse = (userMessage: string): string => {
@@ -239,7 +239,7 @@ function App() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
       {/* ヘッダー */}
       <Header
         user={authState.user!}
@@ -249,7 +249,7 @@ function App() {
       />
 
       {/* メインコンテンツ */}
-      <div className="flex-1 flex pt-16 overflow-hidden">
+      <div className="flex-1 flex overflow-hidden">
         {/* サイドバー */}
         <Sidebar
           chats={chats}
@@ -262,15 +262,11 @@ function App() {
         />
 
         {/* チャットエリア */}
-        <div className={`flex-1 flex flex-col transition-all duration-300 ${
-          isSidebarOpen ? 'lg:ml-80' : 'lg:ml-80'
-        }`}>
-          <ChatArea
-            currentChat={currentChat}
-            onSendMessage={handleSendMessage}
-            isTyping={isTyping}
-          />
-        </div>
+        <ChatArea
+          currentChat={currentChat}
+          onSendMessage={handleSendMessage}
+          isTyping={isTyping}
+        />
       </div>
     </div>
   );

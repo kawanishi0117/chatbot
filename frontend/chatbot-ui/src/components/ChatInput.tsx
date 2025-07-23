@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Mic, MicOff } from 'lucide-react';
+import { Mic, MicOff, Paperclip, Send } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -54,8 +54,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   return (
-    <div className="border-t border-gray-200 bg-white p-4">
-      <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
+    <div className="border-t border-gray-200 bg-white px-4 sm:px-6 py-4">
+      <form onSubmit={handleSubmit} className="max-w-5xl mx-auto">
         <div className="flex items-end space-x-2">
           {/* ファイル添付ボタン */}
           <div className="flex-shrink-0">
