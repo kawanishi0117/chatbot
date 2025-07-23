@@ -245,10 +245,10 @@ const BotSettingsPanel: React.FC<BotSettingsPanelProps> = ({ currentUserId }) =>
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-7xl mx-auto">
         {/* ヘッダー */}
-        <div className="mb-8">
+        <div className="mb-4">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
@@ -270,17 +270,17 @@ const BotSettingsPanel: React.FC<BotSettingsPanelProps> = ({ currentUserId }) =>
         </div>
 
         {/* 検索バー */}
-        <div className="mb-6">
+        <div className="mb-4">
           <div className="relative">
             <input
               type="text"
               placeholder="ボット名または説明で検索..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <svg
-              className="absolute left-3 top-3.5 w-5 h-5 text-gray-400"
+              className="absolute left-3 top-2.5 w-5 h-5 text-gray-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -298,7 +298,7 @@ const BotSettingsPanel: React.FC<BotSettingsPanelProps> = ({ currentUserId }) =>
 
         {/* エラーメッセージ */}
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3">
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">

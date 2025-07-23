@@ -1,15 +1,15 @@
 import {
-	Activity,
-	AlertTriangle,
-	Bot,
-	CheckCircle,
-	Database,
-	Edit,
-	Github,
-	ToggleLeft,
-	ToggleRight,
-	Users,
-	XCircle
+        Activity,
+        AlertTriangle,
+        Bot,
+        CheckCircle,
+        Database,
+        Edit,
+        Github,
+        ToggleLeft,
+        ToggleRight,
+        Users,
+        XCircle
 } from 'lucide-react';
 import React from 'react';
 import { ChatbotConfig } from '../types';
@@ -83,7 +83,7 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 space-y-4">
       {/* ヘッダー */}
       <div className="flex items-start justify-between">
         <div className="flex items-center space-x-4">
@@ -150,13 +150,13 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
       </div>
 
       {/* ステータスカード */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
             <div
               key={index}
-              className={`p-6 rounded-xl border-2 ${getStatusColor(stat.status)} transition-all hover:shadow-md`}
+              className={`p-4 rounded-xl border-2 ${getStatusColor(stat.status)} transition-all hover:shadow-md`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-3">
@@ -181,9 +181,9 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
       </div>
 
       {/* 最近のアクティビティ */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">最近のアクティビティ</h2>
-        <div className="space-y-4">
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">最近のアクティビティ</h2>
+        <div className="space-y-2">
           {[
             {
               action: 'GitHub リポジトリが更新されました',
@@ -206,7 +206,7 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
               type: 'warning'
             }
           ].map((activity, index) => (
-            <div key={index} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
+            <div key={index} className="flex items-center space-x-4 p-2 rounded-lg hover:bg-gray-50 transition-colors">
               <div className={`
                 w-2 h-2 rounded-full
                 ${activity.type === 'success' ? 'bg-green-400' :
@@ -224,7 +224,7 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
       </div>
 
       {/* クイック設定 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {[
           {
             title: 'GitHub連携',
@@ -252,7 +252,7 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
           return (
             <button
               key={index}
-              className="p-4 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all text-left group"
+              className="p-3 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all text-left group"
             >
               <div className={`w-10 h-10 bg-gradient-to-r ${item.color} rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
                 <Icon className="w-5 h-5 text-white" />
