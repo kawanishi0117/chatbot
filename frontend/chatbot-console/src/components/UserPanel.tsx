@@ -3,7 +3,6 @@ import {
 	Edit,
 	Eye,
 	Filter,
-	Mail,
 	Plus,
 	Search,
 	Shield,
@@ -22,6 +21,7 @@ const UserPanel: React.FC<UserPanelProps> = ({ chatbot, onSave }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [permissionFilter, setPermissionFilter] = useState<string>('all');
   const [isInviting, setIsInviting] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
 
   // デモ用のユーザーデータ
   const [userAccess, setUserAccess] = useState<(UserAccess & { user: User })[]>([
@@ -117,6 +117,22 @@ const UserPanel: React.FC<UserPanelProps> = ({ chatbot, onSave }) => {
     setUserAccess(prev => prev.filter(access => access.id !== accessId));
   };
 
+  const handleInviteUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    // デモ用の招待処理
+    console.log('User invited');
+    setIsInviting(false);
+  };
+
+  const handleViewUser = (user: User) => {
+    // デモ用のユーザー詳細表示
+    console.log('View user:', user);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('ja-JP');
+  };
+
   const InviteUserForm: React.FC<{ onSave: (email: string, permission: string) => void; onCancel: () => void }> = ({ 
     onSave, 
     onCancel 
@@ -186,216 +202,202 @@ const UserPanel: React.FC<UserPanelProps> = ({ chatbot, onSave }) => {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* ヘッダー */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center space-x-3">
-            <Users className="w-8 h-8" />
-            <span>ユーザー管理</span>
-          </h1>
-          <p className="text-gray-600 mt-1">
-            チャットボットにアクセスできるユーザーと権限を管理します
-          </p>
-        </div>
-
-        <button
-          onClick={() => setIsInviting(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>ユーザーを招待</span>
-        </button>
-      </div>
-
-      {/* 招待フォーム */}
-      {isInviting && (
-        <InviteUserForm
-          onSave={(email, permission) => {
-            // デモ用の新規ユーザー追加
-            const newUser: User = {
-              id: `user${Date.now()}`,
-              email,
-              name: email.split('@')[0],
-              role: 'user',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            };
-
-            const newAccess: UserAccess & { user: User } = {
-              id: Date.now().toString(),
-              chatbotId: chatbot.id,
-              userId: newUser.id,
-              permission: permission as any,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              user: newUser
-            };
-
-            setUserAccess(prev => [...prev, newAccess]);
-            setIsInviting(false);
-          }}
-          onCancel={() => setIsInviting(false)}
-        />
-      )}
-
-      {/* 検索とフィルター */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ユーザー名またはメールアドレスで検索..."
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+    <div className="h-full overflow-y-auto scrollbar-thin">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
+        {/* ヘッダー */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">ユーザー管理</h1>
+            <p className="text-gray-600 mt-1">
+              {chatbot.name} へのアクセス権限を管理してください
+            </p>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <Filter className="w-5 h-5 text-gray-400" />
-            <select
-              value={permissionFilter}
-              onChange={(e) => setPermissionFilter(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="all">すべての権限</option>
-              <option value="admin">管理者</option>
-              <option value="write">編集者</option>
-              <option value="read">閲覧者</option>
-            </select>
+          <button
+            onClick={() => setIsInviting(true)}
+            className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>ユーザーを招待</span>
+          </button>
+        </div>
+
+        {/* 検索とフィルター */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <div className="flex items-center space-x-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="ユーザー名またはメールアドレスで検索..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Filter className="w-5 h-5 text-gray-400" />
+              <select
+                value={permissionFilter}
+                onChange={(e) => setPermissionFilter(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">すべての権限</option>
+                <option value="admin">管理者</option>
+                <option value="write">編集者</option>
+                <option value="read">閲覧者</option>
+              </select>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ユーザーリスト */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-lg font-semibold text-gray-900">
-            アクセス権限を持つユーザー ({filteredUsers.length}名)
-          </h2>
-        </div>
-
-        <div className="divide-y divide-gray-200">
-          {filteredUsers.map((access) => (
-            <div key={access.id} className="p-6 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full">
-                    <span className="text-white font-semibold text-lg">
-                      {access.user.name.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{access.user.name}</h3>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <Mail className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-600">{access.user.email}</span>
-                    </div>
-                    <div className="flex items-center space-x-4 mt-2">
-                      <span className={`
-                        inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                        ${getPermissionColor(access.permission)}
-                      `}>
-                        <Shield className="w-3 h-3 mr-1" />
-                        {getPermissionLabel(access.permission)}
-                      </span>
-                      <div className="flex items-center space-x-1 text-xs text-gray-500">
-                        <Calendar className="w-3 h-3" />
-                        <span>
-                          追加日: {new Date(access.createdAt).toLocaleDateString('ja-JP')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+        {/* ユーザー招待フォーム */}
+        {isInviting && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">新しいユーザーを招待</h3>
+              <button
+                onClick={() => setIsInviting(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleInviteUser} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    メールアドレス
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="user@example.com"
+                  />
                 </div>
-
-                <div className="flex items-center space-x-2">
-                  <select
-                    value={access.permission}
-                    onChange={(e) => handleUpdatePermission(access.id, e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    権限レベル
+                  </label>
+                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="read">閲覧者</option>
                     <option value="write">編集者</option>
                     <option value="admin">管理者</option>
                   </select>
-
-                  <button
-                    onClick={() => handleRemoveUser(access.id)}
-                    className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                    title="アクセス権限を削除"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {filteredUsers.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
-            <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {searchQuery || permissionFilter !== 'all' 
-                ? '条件に一致するユーザーが見つかりません' 
-                : 'アクセス権限を持つユーザーがいません'
-              }
-            </h3>
-            <p className="text-gray-600 mb-4">
-              {searchQuery || permissionFilter !== 'all'
-                ? '検索条件を変更してお試しください'
-                : 'チャットボットを利用するユーザーを招待してください'
-              }
-            </p>
-            {!searchQuery && permissionFilter === 'all' && (
-              <button
-                onClick={() => setIsInviting(true)}
-                className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                <span>最初のユーザーを招待</span>
-              </button>
-            )}
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsInviting(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  招待を送信
+                </button>
+              </div>
+            </form>
           </div>
         )}
-      </div>
 
-      {/* 権限説明 */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-        <h3 className="font-semibold text-blue-900 mb-3">権限レベルについて</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white p-4 rounded-lg">
-            <div className="flex items-center space-x-2 mb-2">
-              <Eye className="w-5 h-5 text-green-600" />
-              <h4 className="font-medium text-green-900">閲覧者</h4>
+        {/* ユーザー一覧 */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">アクセス権を持つユーザー</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  {filteredUsers.length}名のユーザーがアクセス権を持っています
+                </p>
+              </div>
             </div>
-            <p className="text-sm text-green-800">
-              チャットボットの利用のみ可能。設定の閲覧・変更はできません。
-            </p>
           </div>
-
-          <div className="bg-white p-4 rounded-lg">
-            <div className="flex items-center space-x-2 mb-2">
-              <Edit className="w-5 h-5 text-blue-600" />
-              <h4 className="font-medium text-blue-900">編集者</h4>
-            </div>
-            <p className="text-sm text-blue-800">
-              チャットボットの利用と基本設定の変更が可能。ユーザー管理はできません。
-            </p>
+          
+          <div className="divide-y divide-gray-200">
+            {filteredUsers.map((userAccess) => (
+              <div key={userAccess.id} className="p-6 hover:bg-gray-50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                      <span className="text-lg font-semibold text-blue-600">
+                        {userAccess.user.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900">{userAccess.user.name}</h4>
+                      <p className="text-sm text-gray-600">{userAccess.user.email}</p>
+                      <div className="flex items-center space-x-4 mt-1">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getPermissionColor(userAccess.permission)}`}>
+                          <Shield className="w-3 h-3 mr-1" />
+                          {getPermissionLabel(userAccess.permission)}
+                        </span>
+                        <span className="text-xs text-gray-500 flex items-center">
+                          <Calendar className="w-3 h-3 mr-1" />
+                          {formatDate(userAccess.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setEditingUser(userAccess)}
+                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="編集"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleViewUser(userAccess.user)}
+                      className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                      title="詳細"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleRemoveUser(userAccess.id)}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="削除"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-
-          <div className="bg-white p-4 rounded-lg">
-            <div className="flex items-center space-x-2 mb-2">
-              <Shield className="w-5 h-5 text-red-600" />
-              <h4 className="font-medium text-red-900">管理者</h4>
+          
+          {filteredUsers.length === 0 && (
+            <div className="p-8 text-center text-gray-500">
+              <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p className="text-lg font-medium mb-2">ユーザーが見つかりません</p>
+              <p className="text-sm">検索条件を変更してお試しください</p>
             </div>
-            <p className="text-sm text-red-800">
-              すべての操作が可能。ユーザー管理、削除、セキュリティ設定なども含みます。
-            </p>
+          )}
+        </div>
+
+        {/* 権限レベルの説明 */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+          <h3 className="text-lg font-semibold text-blue-900 mb-3">権限レベルについて</h3>
+          <div className="space-y-2 text-sm text-blue-800">
+            <div className="flex items-start space-x-2">
+              <span className="font-medium">管理者:</span>
+              <span>すべての設定変更、ユーザー管理、ボットの削除が可能</span>
+            </div>
+            <div className="flex items-start space-x-2">
+              <span className="font-medium">編集者:</span>
+              <span>ボット設定の変更、コンテンツの編集が可能</span>
+            </div>
+            <div className="flex items-start space-x-2">
+              <span className="font-medium">閲覧者:</span>
+              <span>ボットとの会話のみ可能（設定変更は不可）</span>
+            </div>
           </div>
         </div>
       </div>

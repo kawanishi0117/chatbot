@@ -1,5 +1,5 @@
+import { Edit3, MessageCircle, Plus, Trash2 } from 'lucide-react';
 import React from 'react';
-import { Plus, MessageCircle, Trash2, Edit3 } from 'lucide-react';
 import { Chat } from '../types';
 
 interface SidebarProps {
@@ -48,9 +48,9 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* サイドバー */}
       <div
-        className={`fixed top-16 left-0 h-[calc(100vh-4rem)] w-80 bg-white border-r border-gray-200 z-40 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 left-0 h-full w-80 bg-white border-r border-gray-200 z-40 transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
-        } lg:translate-x-0 lg:static lg:h-screen lg:top-0 lg:pt-16`}
+        } lg:translate-x-0 lg:static lg:h-full`}
       >
         <div className="flex flex-col h-full">
           {/* 新しいチャットボタン */}
@@ -111,20 +111,20 @@ const Sidebar: React.FC<SidebarProps> = ({
                               e.stopPropagation();
                               // 編集機能は今回は実装しない
                             }}
-                            className="p-1 rounded hover:bg-gray-200 transition-colors"
+                            className="p-2 rounded hover:bg-gray-200 transition-colors"
                             aria-label="Edit chat"
                           >
-                            <Edit3 className="w-3 h-3 text-gray-500" />
+                            <Edit3 className="w-4 h-4 text-gray-500" />
                           </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               onDeleteChat(chat.id);
                             }}
-                            className="p-1 rounded hover:bg-red-100 transition-colors"
+                            className="p-2 rounded hover:bg-red-100 transition-colors"
                             aria-label="Delete chat"
                           >
-                            <Trash2 className="w-3 h-3 text-red-500" />
+                            <Trash2 className="w-4 h-4 text-red-500" />
                           </button>
                         </div>
                       </div>

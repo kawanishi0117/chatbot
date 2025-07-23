@@ -1,8 +1,8 @@
-import React, { useRef, useEffect } from 'react';
 import { Bot, Sparkles } from 'lucide-react';
-import Message from './Message';
+import React, { useEffect, useRef } from 'react';
+import { Chat } from '../types';
 import ChatInput from './ChatInput';
-import { Chat, Message as MessageType } from '../types';
+import Message from './Message';
 
 interface ChatAreaProps {
   currentChat: Chat | null;
@@ -19,20 +19,20 @@ const ChatArea: React.FC<ChatAreaProps> = ({ currentChat, onSendMessage, isTypin
   }, [currentChat?.messages, isTyping]);
 
   const EmptyState = () => (
-    <div className="flex-1 flex items-center justify-center p-4">
-      <div className="text-center max-w-md">
-        <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-          <Bot className="w-7 h-7 text-blue-600" />
+    <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto scrollbar-thin">
+      <div className="text-center max-w-2xl">
+        <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+          <Bot className="w-10 h-10 text-white" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">ChatBot AIへようこそ</h2>
-        <p className="text-gray-600 mb-4">
+        <h2 className="text-3xl font-bold text-gray-900 mb-3">ChatBot AIへようこそ</h2>
+        <p className="text-lg text-gray-600 mb-8">
           質問や相談をお気軽にどうぞ。AIがお答えします。
         </p>
         
         {/* サンプル質問 */}
-        <div className="space-y-1.5">
-          <p className="text-sm font-medium text-gray-700 mb-2">例えば、こんなことを聞いてみてください：</p>
-          <div className="grid gap-1.5">
+        <div className="space-y-3">
+          <p className="text-sm font-semibold text-gray-700 mb-4">例えば、こんなことを聞いてみてください：</p>
+          <div className="grid gap-3 sm:grid-cols-2">
             {[
               '今日の天気はどうですか？',
               'JavaScriptについて教えて',
@@ -42,10 +42,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({ currentChat, onSendMessage, isTypin
               <button
                 key={index}
                 onClick={() => onSendMessage(suggestion)}
-                className="px-3 py-1.5 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200"
+                className="px-4 py-3 text-sm bg-white text-blue-700 rounded-lg hover:bg-blue-50 hover:shadow-md transition-all border border-blue-200 flex items-center"
               >
-                <Sparkles className="w-3 h-3 inline mr-2" />
-                {suggestion}
+                <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
+                <span className="text-left">{suggestion}</span>
               </button>
             ))}
           </div>
@@ -56,7 +56,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ currentChat, onSendMessage, isTypin
 
   if (!currentChat) {
     return (
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <EmptyState />
         <ChatInput onSendMessage={onSendMessage} />
       </div>
@@ -64,7 +64,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ currentChat, onSendMessage, isTypin
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full">
+    <div className="flex-1 flex flex-col overflow-hidden">
       {/* チャットヘッダー */}
       <div className="flex-shrink-0 border-b border-gray-200 p-3 bg-white">
         <div className="flex items-center space-x-3">
@@ -79,8 +79,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({ currentChat, onSendMessage, isTypin
       </div>
 
       {/* メッセージエリア */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        <div className="max-w-4xl mx-auto">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin">
+        <div className="w-full max-w-5xl mx-auto">
           {currentChat.messages.length === 0 ? (
             <div className="text-center py-6">
               <Bot className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -89,7 +89,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ currentChat, onSendMessage, isTypin
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {currentChat.messages.map((message) => (
                 <div key={message.id} className="group">
                   <Message message={message} />

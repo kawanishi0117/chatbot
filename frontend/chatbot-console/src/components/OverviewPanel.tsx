@@ -1,15 +1,16 @@
 import {
-        Activity,
-        AlertTriangle,
-        Bot,
-        CheckCircle,
-        Database,
-        Edit,
-        Github,
-        ToggleLeft,
-        ToggleRight,
-        Users,
-        XCircle
+    AlertTriangle,
+    BarChart3,
+    Bot,
+    CheckCircle,
+    Clock,
+    Database,
+    Edit,
+    Github,
+    Link,
+    Power,
+    Users,
+    XCircle
 } from 'lucide-react';
 import React from 'react';
 import { ChatbotConfig } from '../types';
@@ -31,28 +32,32 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
       value: chatbot.githubRepo ? '設定済み' : '未設定',
       icon: Github,
       status: chatbot.githubRepo ? 'success' : 'warning',
-      detail: chatbot.githubRepo || 'リポジトリが設定されていません'
+      detail: chatbot.githubRepo || 'リポジトリが設定されていません',
+      href: '#github'
     },
     {
       label: 'S3フォルダ',
       value: chatbot.s3Folder ? '設定済み' : '未設定',
       icon: Database,
       status: chatbot.s3Folder ? 'success' : 'warning',
-      detail: chatbot.s3Folder || 'S3フォルダが設定されていません'
+      detail: chatbot.s3Folder || 'S3フォルダが設定されていません',
+      href: '#s3'
     },
     {
-      label: 'アクセス許可',
-      value: '3ユーザー',
+      label: 'Webhook',
+      value: '未設定',
+      icon: Link,
+      status: 'warning',
+      detail: 'Webhookが設定されていません',
+      href: '#webhooks'
+    },
+    {
+      label: 'ユーザー管理',
+      value: '3名',
       icon: Users,
       status: 'success',
-      detail: '管理者: 1名、一般ユーザー: 2名'
-    },
-    {
-      label: '稼働状況',
-      value: chatbot.isActive ? 'アクティブ' : '停止中',
-      icon: Activity,
-      status: chatbot.isActive ? 'success' : 'error',
-      detail: chatbot.isActive ? '正常に動作しています' : 'ボットが停止しています'
+      detail: '管理者: 1名、一般ユーザー: 2名',
+      href: '#users'
     }
   ];
 
@@ -72,196 +77,168 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'success':
-        return 'bg-green-50 border-green-200';
+        return 'bg-green-50 border-green-200 hover:bg-green-100';
       case 'warning':
-        return 'bg-yellow-50 border-yellow-200';
+        return 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100';
       case 'error':
-        return 'bg-red-50 border-red-200';
+        return 'bg-red-50 border-red-200 hover:bg-red-100';
       default:
-        return 'bg-gray-50 border-gray-200';
+        return 'bg-gray-50 border-gray-200 hover:bg-gray-100';
     }
   };
 
   return (
-    <div className="p-4 space-y-4">
-      {/* ヘッダー */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-center space-x-4">
-          <div className={`
-            flex items-center justify-center w-16 h-16 rounded-2xl
-            ${chatbot.isActive 
-              ? 'bg-gradient-to-r from-green-400 to-blue-500' 
-              : 'bg-gradient-to-r from-gray-400 to-gray-600'
-            }
-          `}>
-            <Bot className="w-8 h-8 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{chatbot.name}</h1>
-            <p className="text-gray-600 mt-1">{chatbot.description}</p>
-            <div className="flex items-center space-x-2 mt-2">
-              <span className={`
-                inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+    <div className="h-full overflow-y-auto scrollbar-thin">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
+        {/* ヘッダー */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center space-x-4">
+              <div className={`
+                flex items-center justify-center w-16 h-16 rounded-2xl shadow-lg
                 ${chatbot.isActive 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-gray-100 text-gray-800'
+                  ? 'bg-gradient-to-br from-green-400 to-blue-500' 
+                  : 'bg-gradient-to-br from-gray-400 to-gray-600'
                 }
               `}>
-                {chatbot.isActive ? 'アクティブ' : '停止中'}
-              </span>
-              <span className="text-xs text-gray-500">
-                作成日: {new Date(chatbot.createdAt).toLocaleDateString('ja-JP')}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={onToggleStatus}
-            className={`
-              flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors
-              ${chatbot.isActive
-                ? 'bg-red-50 text-red-700 hover:bg-red-100'
-                : 'bg-green-50 text-green-700 hover:bg-green-100'
-              }
-            `}
-          >
-            {chatbot.isActive ? (
-              <>
-                <ToggleLeft className="w-4 h-4" />
-                停止
-              </>
-            ) : (
-              <>
-                <ToggleRight className="w-4 h-4" />
-                開始
-              </>
-            )}
-          </button>
-          <button
-            onClick={onEdit}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg font-medium transition-colors"
-          >
-            <Edit className="w-4 h-4" />
-            編集
-          </button>
-        </div>
-      </div>
-
-      {/* ステータスカード */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {stats.map((stat, index) => {
-          const Icon = stat.icon;
-          return (
-            <div
-              key={index}
-              className={`p-4 rounded-xl border-2 ${getStatusColor(stat.status)} transition-all hover:shadow-md`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-white rounded-lg shadow-sm">
-                    <Icon className="w-6 h-6 text-gray-700" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{stat.label}</h3>
-                    <p className="text-sm text-gray-600 mt-1">{stat.detail}</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  {getStatusIcon(stat.status)}
-                  <span className="text-sm font-medium text-gray-900">
-                    {stat.value}
+                <Bot className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">{chatbot.name}</h1>
+                <p className="text-gray-600 mt-1">{chatbot.description || 'チャットボットの説明がありません'}</p>
+                <div className="flex items-center gap-4 mt-3">
+                  <span className={`
+                    inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                    ${chatbot.isActive 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-gray-100 text-gray-800'
+                    }
+                  `}>
+                    <Power className="w-4 h-4 mr-1.5" />
+                    {chatbot.isActive ? 'アクティブ' : '停止中'}
+                  </span>
+                  <span className="text-sm text-gray-500 flex items-center">
+                    <Clock className="w-4 h-4 mr-1" />
+                    最終更新: {new Date(chatbot.updatedAt).toLocaleDateString('ja-JP')}
                   </span>
                 </div>
               </div>
             </div>
-          );
-        })}
-      </div>
-
-      {/* 最近のアクティビティ */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">最近のアクティビティ</h2>
-        <div className="space-y-2">
-          {[
-            {
-              action: 'GitHub リポジトリが更新されました',
-              time: '2時間前',
-              type: 'info'
-            },
-            {
-              action: 'S3 フォルダの同期が完了しました',
-              time: '4時間前',
-              type: 'success'
-            },
-            {
-              action: '新しいユーザーがアクセス権限を取得しました',
-              time: '1日前',
-              type: 'info'
-            },
-            {
-              action: 'Webhook の設定が変更されました',
-              time: '2日前',
-              type: 'warning'
-            }
-          ].map((activity, index) => (
-            <div key={index} className="flex items-center space-x-4 p-2 rounded-lg hover:bg-gray-50 transition-colors">
-              <div className={`
-                w-2 h-2 rounded-full
-                ${activity.type === 'success' ? 'bg-green-400' :
-                  activity.type === 'warning' ? 'bg-yellow-400' :
-                  activity.type === 'error' ? 'bg-red-400' : 'bg-blue-400'
-                }
-              `} />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900">{activity.action}</p>
-              </div>
-              <span className="text-xs text-gray-500">{activity.time}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* クイック設定 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {[
-          {
-            title: 'GitHub連携',
-            description: 'リポジトリの設定を管理',
-            action: 'github',
-            icon: Github,
-            color: 'from-gray-600 to-gray-800'
-          },
-          {
-            title: 'S3設定',
-            description: 'データソースの設定',
-            action: 's3',
-            icon: Database,
-            color: 'from-orange-500 to-red-600'
-          },
-          {
-            title: 'ユーザー管理',
-            description: 'アクセス権限の設定',
-            action: 'users',
-            icon: Users,
-            color: 'from-purple-500 to-indigo-600'
-          }
-        ].map((item, index) => {
-          const Icon = item.icon;
-          return (
+            
             <button
-              key={index}
-              className="p-3 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all text-left group"
+              onClick={onToggleStatus}
+              className={`
+                inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all
+                ${chatbot.isActive 
+                  ? 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200' 
+                  : 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
+                }
+              `}
             >
-              <div className={`w-10 h-10 bg-gradient-to-r ${item.color} rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                <Icon className="w-5 h-5 text-white" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-1">{item.title}</h3>
-              <p className="text-sm text-gray-600">{item.description}</p>
+              <Power className="w-4 h-4" />
+              {chatbot.isActive ? '停止する' : '開始する'}
             </button>
-          );
-        })}
+          </div>
+        </div>
+
+        {/* 統計情報 */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          {stats.map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <a
+                key={stat.label}
+                href={stat.href}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onEdit();
+                }}
+                className={`
+                  block bg-white rounded-xl border p-6 transition-all cursor-pointer
+                  ${getStatusColor(stat.status)}
+                `}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className={`
+                    w-12 h-12 rounded-lg flex items-center justify-center
+                    ${stat.status === 'success' ? 'bg-green-100' : 
+                      stat.status === 'warning' ? 'bg-yellow-100' : 'bg-red-100'}
+                  `}>
+                    <Icon className={`
+                      w-6 h-6
+                      ${stat.status === 'success' ? 'text-green-600' : 
+                        stat.status === 'warning' ? 'text-yellow-600' : 'text-red-600'}
+                    `} />
+                  </div>
+                  {getStatusIcon(stat.status)}
+                </div>
+                
+                <h3 className="text-sm font-medium text-gray-600 mb-1">{stat.label}</h3>
+                <p className="text-xl font-bold text-gray-900 mb-2">{stat.value}</p>
+                <p className="text-xs text-gray-500 line-clamp-2">{stat.detail}</p>
+              </a>
+            );
+          })}
+        </div>
+
+        {/* 最近のアクティビティ */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+              <BarChart3 className="w-5 h-5 mr-2 text-gray-500" />
+              最近のアクティビティ
+            </h2>
+            <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+              すべて表示
+            </button>
+          </div>
+          
+          <div className="space-y-3">
+            {[
+              { time: '2時間前', action: 'GitHub リポジトリが更新されました', type: 'github' },
+              { time: '4時間前', action: '新しいユーザーがアクセス権限を取得しました', type: 'user' },
+              { time: '1日前', action: 'S3 フォルダの同期が完了しました', type: 's3' },
+            ].map((activity, index) => (
+              <div key={index} className="flex items-start space-x-3 py-2">
+                <div className={`
+                  w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0
+                  ${activity.type === 'github' ? 'bg-purple-100' :
+                    activity.type === 'user' ? 'bg-blue-100' : 'bg-green-100'}
+                `}>
+                  {activity.type === 'github' ? <Github className="w-4 h-4 text-purple-600" /> :
+                   activity.type === 'user' ? <Users className="w-4 h-4 text-blue-600" /> :
+                   <Database className="w-4 h-4 text-green-600" />}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-900">{activity.action}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{activity.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* クイックアクション */}
+        <div className="bg-blue-50 rounded-xl border border-blue-200 p-6">
+          <h3 className="text-lg font-semibold text-blue-900 mb-3">クイックアクション</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <button 
+              onClick={onEdit}
+              className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-white border border-blue-200 rounded-lg text-blue-700 hover:bg-blue-100 transition-all font-medium"
+            >
+              <Edit className="w-4 h-4" />
+              設定を編集
+            </button>
+            <button className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-white border border-blue-200 rounded-lg text-blue-700 hover:bg-blue-100 transition-all font-medium">
+              <BarChart3 className="w-4 h-4" />
+              統計を表示
+            </button>
+            <button className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-white border border-blue-200 rounded-lg text-blue-700 hover:bg-blue-100 transition-all font-medium">
+              <Link className="w-4 h-4" />
+              Webhookをテスト
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
