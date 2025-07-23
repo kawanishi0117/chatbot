@@ -111,20 +111,20 @@ const Sidebar: React.FC<SidebarProps> = ({
                               e.stopPropagation();
                               // 編集機能は今回は実装しない
                             }}
-                            className="p-1 rounded hover:bg-gray-200 transition-colors"
+                            className="p-2 rounded hover:bg-gray-200 transition-colors"
                             aria-label="Edit chat"
                           >
-                            <Edit3 className="w-3 h-3 text-gray-500" />
+                            <Edit3 className="w-4 h-4 text-gray-500" />
                           </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               onDeleteChat(chat.id);
                             }}
-                            className="p-1 rounded hover:bg-red-100 transition-colors"
+                            className="p-2 rounded hover:bg-red-100 transition-colors"
                             aria-label="Delete chat"
                           >
-                            <Trash2 className="w-3 h-3 text-red-500" />
+                            <Trash2 className="w-4 h-4 text-red-500" />
                           </button>
                         </div>
                       </div>
