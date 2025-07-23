@@ -22,10 +22,10 @@ const Message: React.FC<MessageProps> = ({ message, isTyping = false }) => {
   };
 
   return (
-    <div className={`flex w-full mb-6 ${isUser ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex w-full mb-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className={`flex max-w-[80%] ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
         {/* アバター */}
-        <div className={`flex-shrink-0 ${isUser ? 'ml-3' : 'mr-3'}`}>
+        <div className={`flex-shrink-0 ${isUser ? 'ml-2' : 'mr-2'}`}>
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center ${
               isUser 
@@ -45,7 +45,7 @@ const Message: React.FC<MessageProps> = ({ message, isTyping = false }) => {
         <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
           {/* メッセージバブル */}
           <div
-            className={`relative px-4 py-2 rounded-lg ${
+            className={`relative px-3 py-1.5 rounded-lg ${
               isUser
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 text-gray-900 border border-gray-200'

@@ -19,20 +19,20 @@ const ChatArea: React.FC<ChatAreaProps> = ({ currentChat, onSendMessage, isTypin
   }, [currentChat?.messages, isTyping]);
 
   const EmptyState = () => (
-    <div className="flex-1 flex items-center justify-center p-8">
+    <div className="flex-1 flex items-center justify-center p-4">
       <div className="text-center max-w-md">
-        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Bot className="w-8 h-8 text-blue-600" />
+        <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+          <Bot className="w-7 h-7 text-blue-600" />
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">ChatBot AIへようこそ</h2>
-        <p className="text-gray-600 mb-6">
+        <p className="text-gray-600 mb-4">
           質問や相談をお気軽にどうぞ。AIがお答えします。
         </p>
         
         {/* サンプル質問 */}
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-gray-700 mb-3">例えば、こんなことを聞いてみてください：</p>
-          <div className="grid gap-2">
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium text-gray-700 mb-2">例えば、こんなことを聞いてみてください：</p>
+          <div className="grid gap-1.5">
             {[
               '今日の天気はどうですか？',
               'JavaScriptについて教えて',
@@ -42,7 +42,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ currentChat, onSendMessage, isTypin
               <button
                 key={index}
                 onClick={() => onSendMessage(suggestion)}
-                className="px-4 py-2 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200"
+                className="px-3 py-1.5 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200"
               >
                 <Sparkles className="w-3 h-3 inline mr-2" />
                 {suggestion}
@@ -66,7 +66,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ currentChat, onSendMessage, isTypin
   return (
     <div className="flex-1 flex flex-col h-full">
       {/* チャットヘッダー */}
-      <div className="flex-shrink-0 border-b border-gray-200 p-4 bg-white">
+      <div className="flex-shrink-0 border-b border-gray-200 p-3 bg-white">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
             <Bot className="w-5 h-5 text-green-600" />
@@ -79,17 +79,17 @@ const ChatArea: React.FC<ChatAreaProps> = ({ currentChat, onSendMessage, isTypin
       </div>
 
       {/* メッセージエリア */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
         <div className="max-w-4xl mx-auto">
           {currentChat.messages.length === 0 ? (
-            <div className="text-center py-8">
-              <Bot className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <div className="text-center py-6">
+              <Bot className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">
                 新しいチャットを開始しました。何でもお聞きください！
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {currentChat.messages.map((message) => (
                 <div key={message.id} className="group">
                   <Message message={message} />
