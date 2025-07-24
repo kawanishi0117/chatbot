@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import ChatArea from './components/ChatArea';
 import Header from './components/Header';
+import { LoadingSpinner } from './components/loading';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
 import { api, getToken } from './services/api';
@@ -228,7 +229,7 @@ function App() {
   if (authState.isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <LoadingSpinner size="xl" color="primary" />
       </div>
     );
   }

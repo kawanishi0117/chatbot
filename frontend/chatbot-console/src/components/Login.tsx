@@ -1,6 +1,7 @@
 import { Eye, EyeOff, Settings, Shield } from 'lucide-react';
 import React, { useState } from 'react';
 import { api } from '../services/api';
+import { LoadingButton } from './loading';
 
 interface LoginProps {
   onLogin: (email: string, password: string) => void;
@@ -172,23 +173,17 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </div>
             )}
 
-            <button
+            <LoadingButton
               type="submit"
-              disabled={isLoading}
-              className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              isLoading={isLoading}
+              loadingText={isRegisterMode ? '登録中...' : 'ログイン中...'}
+              variant="primary"
+              size="lg"
+              className="w-full"
             >
-              {isLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  {isRegisterMode ? '登録中...' : 'ログイン中...'}
-                </>
-              ) : (
-                <>
-                  <Shield className="w-4 h-4 mr-2" />
-                  {isRegisterMode ? '新規登録' : '管理者ログイン'}
-                </>
-              )}
-            </button>
+              <Shield className="w-4 h-4 mr-2" />
+              {isRegisterMode ? '新規登録' : '管理者ログイン'}
+            </LoadingButton>
           </form>
 
           <div className="mt-6 text-center">
