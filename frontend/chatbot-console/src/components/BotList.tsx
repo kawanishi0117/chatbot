@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import React from 'react';
 import { BotSettings } from '../types';
-import { LoadingButton, LoadingSkeleton } from './loading';
+import { LoadingSkeleton } from './loading';
 
 interface BotListProps {
   bots: BotSettings[];
@@ -105,14 +105,13 @@ const BotList: React.FC<BotListProps> = ({
           <p className="text-lg text-gray-600 mb-8 max-w-md mx-auto">
             最初のチャットボットを作成して、AIアシスタントの構築を始めましょう
           </p>
-          <LoadingButton
+          <button
             onClick={onRefresh}
-            variant="outline"
-            size="md"
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-4 h-4 mr-2" />
             再読み込み
-          </LoadingButton>
+          </button>
         </div>
       </div>
     );

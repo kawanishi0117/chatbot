@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import BotList from './components/BotList'; // Added BotList import
 import GitHubPanel from './components/GitHubPanel';
 import Header from './components/Header';
-import { LoadingSpinner } from './components/loading';
+import { LoadingOverlay, LoadingSpinner } from './components/loading';
 import Login from './components/Login';
 import OverviewPanel from './components/OverviewPanel';
 import S3Panel from './components/S3Panel';
@@ -25,6 +25,10 @@ function App() {
   const [currentView, setCurrentView] = useState('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCreatingBot, setIsCreatingBot] = useState(false);
+  const [isUserInfoLoading, setIsUserInfoLoading] = useState(false);
+  const [isSavingBot, setIsSavingBot] = useState(false);
+  const [isLoadingBots, setIsLoadingBots] = useState(false);
+  const [isDeletingBot, setIsDeletingBot] = useState(false);
 
   // 初期化時にトークンをチェック
   useEffect(() => {
@@ -70,6 +74,7 @@ function App() {
   useEffect(() => {
     const fetchBots = async () => {
       if (authState.isAuthenticated && authState.user) {
+        setIsLoadingBots(true);
         try {
           const response = await api.getBots();
           const botList = response.bots.map(bot => ({
@@ -88,6 +93,8 @@ function App() {
           }
         } catch (error) {
           console.error('Failed to fetch bots:', error);
+        } finally {
+          setIsLoadingBots(false);
         }
       }
     };
@@ -98,6 +105,7 @@ function App() {
   const handleLogin = async (_email: string, _password: string) => {
     // Login コンポーネント内で既にAPIを呼び出しているので、
     // ここではユーザー情報を再取得
+    setIsUserInfoLoading(true);
     try {
       const user = await api.getCurrentUser();
       setAuthState({
@@ -114,6 +122,8 @@ function App() {
       });
     } catch (error) {
       console.error('Failed to get user info:', error);
+    } finally {
+      setIsUserInfoLoading(false);
     }
   };
 
@@ -151,10 +161,12 @@ function App() {
 
   // チャットボット作成の保存処理
   const handleSaveNewChatbot = async (botData: { name: string; description: string }) => {
+    setIsSavingBot(true);
     try {
       const response = await api.createBot({
         botName: botData.name,
-        description: botData.description
+        description: botData.description,
+        creatorId: authState.user?.id || ''
       });
       
       if (response.botId) {
@@ -178,6 +190,8 @@ function App() {
     } catch (error) {
       console.error('Failed to create bot:', error);
       alert('ボットの作成に失敗しました');
+    } finally {
+      setIsSavingBot(false);
     }
   };
 
@@ -213,27 +227,20 @@ function App() {
     // ボット作成フォームを表示
     if (isCreatingBot) {
       return (
-        <div className="h-full flex items-center justify-center p-6">
-          <div className="w-full max-w-2xl">
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">新しいボットを作成</h1>
-            <SimpleBotForm
-              onSave={handleSaveNewChatbot}
-              onCancel={() => setIsCreatingBot(false)}
-            />
-          </div>
+        <div className="h-full">
+          <SimpleBotForm
+            onCancel={() => setIsCreatingBot(false)}
+            onSave={handleSaveNewChatbot}
+          />
         </div>
       );
     }
 
-    // ボットが選択されていない場合はボット一覧を表示
-    if (!selectedChatbot) {
+    // ボット一覧を表示（ボットが選択されていない場合やボット一覧ビューの場合）
+    if (!selectedChatbot || currentView === 'bots') {
       return (
         <div className="h-full">
-          <div className="max-w-7xl mx-auto p-6">
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">マイボット</h1>
-              <p className="text-gray-600">作成したチャットボットの一覧です</p>
-            </div>
+          <div className="max-w-6xl mx-auto px-8 py-8">
             <BotList
               bots={chatbots.map(bot => ({
                 botId: bot.id,
@@ -244,7 +251,7 @@ function App() {
                 createdAt: new Date(bot.createdAt).getTime(),
                 updatedAt: new Date(bot.updatedAt).getTime()
               }))}
-              loading={false}
+              loading={isLoadingBots}
               onEdit={(bot) => {
                 const chatbot = chatbots.find(c => c.id === bot.botId);
                 if (chatbot) {
@@ -254,6 +261,7 @@ function App() {
               }}
               onDelete={async (bot) => {
                 if (confirm(`「${bot.botName}」を削除しますか？この操作は取り消せません。`)) {
+                  setIsDeletingBot(true);
                   try {
                     await api.deleteBot(bot.botId);
                     // ボット削除後、リストを更新
@@ -275,22 +283,31 @@ function App() {
                   } catch (error) {
                     console.error('Failed to delete bot:', error);
                     alert('ボットの削除に失敗しました');
+                  } finally {
+                    setIsDeletingBot(false);
                   }
                 }
               }}
               onRefresh={async () => {
-                const response = await api.getBots();
-                const botList = response.bots.map(bot => ({
-                  id: bot.botId,
-                  name: bot.botName,
-                  description: bot.description,
-                  githubRepo: '',
-                  s3Folder: '',
-                  isActive: bot.isActive,
-                  createdAt: new Date(bot.createdAt).toISOString(),
-                  updatedAt: new Date(bot.updatedAt).toISOString()
-                }));
-                setChatbots(botList);
+                setIsLoadingBots(true);
+                try {
+                  const response = await api.getBots();
+                  const botList = response.bots.map(bot => ({
+                    id: bot.botId,
+                    name: bot.botName,
+                    description: bot.description,
+                    githubRepo: '',
+                    s3Folder: '',
+                    isActive: bot.isActive,
+                    createdAt: new Date(bot.createdAt).toISOString(),
+                    updatedAt: new Date(bot.updatedAt).toISOString()
+                  }));
+                  setChatbots(botList);
+                } catch (error) {
+                  console.error('Failed to refresh bots:', error);
+                } finally {
+                  setIsLoadingBots(false);
+                }
               }}
             />
           </div>
@@ -404,6 +421,32 @@ function App() {
           </div>
         </main>
       </div>
+
+      {/* Loading Overlays */}
+      <LoadingOverlay
+        isVisible={isSavingBot}
+        message="ボットを作成中..."
+        backdrop="dark"
+        size="lg"
+      />
+      <LoadingOverlay
+        isVisible={isLoadingBots}
+        message="ボット一覧を読み込み中..."
+        backdrop="dark"
+        size="lg"
+      />
+      <LoadingOverlay
+        isVisible={isDeletingBot}
+        message="ボットを削除中..."
+        backdrop="dark"
+        size="lg"
+      />
+      <LoadingOverlay
+        isVisible={isUserInfoLoading}
+        message="ユーザー情報を取得中..."
+        backdrop="dark"
+        size="lg"
+      />
     </div>
   );
 }

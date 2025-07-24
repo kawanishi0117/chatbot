@@ -9,6 +9,7 @@ import {
 import BotDeleteModal from './BotDeleteModal';
 import BotForm from './BotForm';
 import BotList from './BotList';
+import { LoadingOverlay } from './loading';
 
 // ボット設定API（仮実装）
 const botSettingsAPI = {
@@ -132,6 +133,9 @@ const BotSettingsPanel: React.FC<BotSettingsPanelProps> = ({ currentUserId }) =>
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [editingBot, setEditingBot] = useState<BotSettings | null>(null);
   const [deletingBot, setDeletingBot] = useState<BotSettings | null>(null);
+  const [isCreatingBot, setIsCreatingBot] = useState(false);
+  const [isUpdatingBot, setIsUpdatingBot] = useState(false);
+  const [isDeletingBot, setIsDeletingBot] = useState(false);
 
   // ボット一覧の取得
   const fetchBots = async () => {
@@ -170,6 +174,7 @@ const BotSettingsPanel: React.FC<BotSettingsPanelProps> = ({ currentUserId }) =>
 
   // ボット作成処理
   const handleCreateBot = async (data: BotSettingsCreateRequest) => {
+    setIsCreatingBot(true);
     try {
       const result = await botSettingsAPI.create(data);
       
@@ -182,6 +187,8 @@ const BotSettingsPanel: React.FC<BotSettingsPanelProps> = ({ currentUserId }) =>
       }
     } catch (error) {
       setError('予期しないエラーが発生しました');
+    } finally {
+      setIsCreatingBot(false);
     }
   };
 
@@ -189,6 +196,7 @@ const BotSettingsPanel: React.FC<BotSettingsPanelProps> = ({ currentUserId }) =>
   const handleUpdateBot = async (data: BotSettingsUpdateRequest) => {
     if (!editingBot) return;
     
+    setIsUpdatingBot(true);
     try {
       const result = await botSettingsAPI.update(editingBot.botId, data);
       
@@ -199,12 +207,15 @@ const BotSettingsPanel: React.FC<BotSettingsPanelProps> = ({ currentUserId }) =>
           )
         );
         setEditingBot(null);
+        setIsFormOpen(false);
         setError(null);
       } else {
         setError(result.error || 'ボットの更新に失敗しました');
       }
     } catch (error) {
       setError('予期しないエラーが発生しました');
+    } finally {
+      setIsUpdatingBot(false);
     }
   };
 
@@ -212,6 +223,7 @@ const BotSettingsPanel: React.FC<BotSettingsPanelProps> = ({ currentUserId }) =>
   const handleDeleteBot = async () => {
     if (!deletingBot) return;
     
+    setIsDeletingBot(true);
     try {
       const result = await botSettingsAPI.delete(deletingBot.botId);
       
@@ -224,6 +236,8 @@ const BotSettingsPanel: React.FC<BotSettingsPanelProps> = ({ currentUserId }) =>
       }
     } catch (error) {
       setError('予期しないエラーが発生しました');
+    } finally {
+      setIsDeletingBot(false);
     }
   };
 
@@ -270,33 +284,19 @@ const BotSettingsPanel: React.FC<BotSettingsPanelProps> = ({ currentUserId }) =>
         </div>
 
         {/* 検索バー */}
-        <div className="mb-4">
-          <div className="relative">
+        <div className="mb-6">
+          <div className="max-w-md">
             <input
               type="text"
               placeholder="ボット名または説明で検索..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
-            <svg
-              className="absolute left-3 top-2.5 w-5 h-5 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                clipRule="evenodd"
-              />
-            </svg>
           </div>
         </div>
 
-        {/* エラーメッセージ */}
+        {/* エラー表示 */}
         {error && (
           <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3">
             <div className="flex">
@@ -341,6 +341,32 @@ const BotSettingsPanel: React.FC<BotSettingsPanelProps> = ({ currentUserId }) =>
           onConfirm={handleDeleteBot}
         />
       </div>
+
+      {/* Loading Overlays */}
+      <LoadingOverlay
+        isVisible={loading}
+        message="ボット一覧を読み込み中..."
+        backdrop="dark"
+        size="lg"
+      />
+      <LoadingOverlay
+        isVisible={isCreatingBot}
+        message="ボットを作成中..."
+        backdrop="dark"
+        size="lg"
+      />
+      <LoadingOverlay
+        isVisible={isUpdatingBot}
+        message="ボットを更新中..."
+        backdrop="dark"
+        size="lg"
+      />
+      <LoadingOverlay
+        isVisible={isDeletingBot}
+        message="ボットを削除中..."
+        backdrop="dark"
+        size="lg"
+      />
     </div>
   );
 };

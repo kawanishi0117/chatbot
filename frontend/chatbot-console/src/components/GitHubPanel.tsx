@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { ChatbotConfig, GitHubRepo } from '../types';
+import { LoadingOverlay } from './loading';
 
 interface GitHubPanelProps {
   chatbot: ChatbotConfig;
@@ -220,18 +221,28 @@ const GitHubPanel: React.FC<GitHubPanelProps> = ({ chatbot, onSave }) => {
           </button>
           <button
             onClick={handleSave}
-            disabled={!selectedRepo || isSaving}
+            disabled={!selectedRepo}
             className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {isSaving ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            <span>{isSaving ? '保存中...' : '設定を保存'}</span>
+            <Save className="w-4 h-4" />
+            <span>設定を保存</span>
           </button>
         </div>
       </div>
+
+      {/* Loading Overlays */}
+      <LoadingOverlay
+        isVisible={isSearching}
+        message="リポジトリを検索中..."
+        backdrop="dark"
+        size="lg"
+      />
+      <LoadingOverlay
+        isVisible={isSaving}
+        message="GitHub設定を保存中..."
+        backdrop="dark"
+        size="lg"
+      />
     </div>
   );
 };

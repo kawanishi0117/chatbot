@@ -1,15 +1,16 @@
 import {
-	Calendar,
-	CheckCircle,
-	Database,
-	Folder,
-	HardDrive,
-	RefreshCw,
-	Save,
-	Search
+    Calendar,
+    CheckCircle,
+    Database,
+    Folder,
+    HardDrive,
+    RefreshCw,
+    Save,
+    Search
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { ChatbotConfig, S3Folder } from '../types';
+import { LoadingOverlay } from './loading';
 
 interface S3PanelProps {
   chatbot: ChatbotConfig;
@@ -229,18 +230,28 @@ const S3Panel: React.FC<S3PanelProps> = ({ chatbot, onSave }) => {
           </button>
           <button
             onClick={handleSave}
-            disabled={!selectedFolder || isSaving}
+            disabled={!selectedFolder}
             className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {isSaving ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            <span>{isSaving ? '保存中...' : '設定を保存'}</span>
+            <Save className="w-4 h-4" />
+            <span>設定を保存</span>
           </button>
         </div>
       </div>
+
+      {/* Loading Overlays */}
+      <LoadingOverlay
+        isVisible={isLoading}
+        message="S3フォルダを更新中..."
+        backdrop="dark"
+        size="lg"
+      />
+      <LoadingOverlay
+        isVisible={isSaving}
+        message="S3設定を保存中..."
+        backdrop="dark"
+        size="lg"
+      />
     </div>
   );
 };

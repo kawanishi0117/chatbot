@@ -1,18 +1,19 @@
 import {
-    AlertTriangle,
-    CheckCircle,
-    Copy,
-    Edit,
-    ExternalLink,
-    Eye,
-    EyeOff,
-    Plus,
-    Trash2,
-    Webhook,
-    XCircle
+	AlertTriangle,
+	CheckCircle,
+	Copy,
+	Edit,
+	ExternalLink,
+	Eye,
+	EyeOff,
+	Plus,
+	Trash2,
+	Webhook,
+	XCircle
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { ChatbotConfig, WebhookConfig } from '../types';
+import { LoadingOverlay } from './loading';
 
 interface WebhookPanelProps {
   chatbot: ChatbotConfig;
@@ -46,6 +47,7 @@ const WebhookPanel: React.FC<WebhookPanelProps> = ({ chatbot, onSave }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [editingWebhook, setEditingWebhook] = useState<WebhookConfig | null>(null);
   const [showSecrets, setShowSecrets] = useState<{[key: string]: boolean}>({});
+  const [isSavingWebhook, setIsSavingWebhook] = useState(false);
 
   const availableEvents = [
     { id: 'message_received', label: 'メッセージ受信', description: 'ユーザーからメッセージを受信したとき' },
@@ -102,9 +104,19 @@ const WebhookPanel: React.FC<WebhookPanelProps> = ({ chatbot, onSave }) => {
       }));
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      onSave(formData);
+      setIsSavingWebhook(true);
+      try {
+        // 実際の保存処理をシミュレート
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        onSave(formData);
+      } catch (error) {
+        console.error('Failed to save webhook:', error);
+        // エラーハンドリングは必要に応じて追加
+      } finally {
+        setIsSavingWebhook(false);
+      }
     };
 
     return (
@@ -404,6 +416,14 @@ const WebhookPanel: React.FC<WebhookPanelProps> = ({ chatbot, onSave }) => {
           </div>
         </div>
       </div>
+
+      {/* Loading Overlay */}
+      <LoadingOverlay
+        isVisible={isSavingWebhook}
+        message="Webhookを保存中..."
+        backdrop="dark"
+        size="lg"
+      />
     </div>
   );
 };

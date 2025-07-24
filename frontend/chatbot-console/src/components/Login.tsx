@@ -1,7 +1,7 @@
 import { Eye, EyeOff, Settings, Shield } from 'lucide-react';
 import React, { useState } from 'react';
 import { api } from '../services/api';
-import { LoadingButton } from './loading';
+import { LoadingOverlay } from './loading';
 
 interface LoginProps {
   onLogin: (email: string, password: string) => void;
@@ -74,6 +74,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           )}
         
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* 既存のフォームフィールド - disabled属性は削除 */}
             {isRegisterMode && (
               <div>
                 <label htmlFor="name" className="block text-sm font-semibold text-gray-700 mb-2">
@@ -173,17 +174,13 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </div>
             )}
 
-            <LoadingButton
+            <button
               type="submit"
-              isLoading={isLoading}
-              loadingText={isRegisterMode ? '登録中...' : 'ログイン中...'}
-              variant="primary"
-              size="lg"
-              className="w-full"
+              className="w-full inline-flex items-center justify-center px-6 py-3 text-base font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 shadow-sm"
             >
               <Shield className="w-4 h-4 mr-2" />
               {isRegisterMode ? '新規登録' : '管理者ログイン'}
-            </LoadingButton>
+            </button>
           </form>
 
           <div className="mt-6 text-center">
@@ -221,9 +218,15 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </p>
           </div>
         </div>
-
-
       </div>
+
+      {/* Loading Overlay */}
+      <LoadingOverlay
+        isVisible={isLoading}
+        message={isRegisterMode ? 'アカウントを作成中...' : 'ログイン中...'}
+        backdrop="dark"
+        size="lg"
+      />
     </div>
   );
 };
