@@ -10,10 +10,12 @@ import Sidebar from './components/Sidebar';
 import SimpleBotForm from './components/SimpleBotForm';
 import UserPanel from './components/UserPanel';
 import WebhookPanel from './components/WebhookPanel';
+import { AlertProvider, useAlert } from './contexts/AlertContext';
 import { api, getToken } from './services/api';
 import { AuthState, ChatbotConfig } from './types';
 
-function App() {
+function AppContent() {
+  const { showAlert, showConfirm } = useAlert();
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
@@ -189,7 +191,7 @@ function App() {
       }
     } catch (error) {
       console.error('Failed to create bot:', error);
-      alert('ボットの作成に失敗しました');
+      await showAlert('ボットの作成に失敗しました', 'error');
     } finally {
       setIsSavingBot(false);
     }
@@ -260,7 +262,13 @@ function App() {
                 }
               }}
               onDelete={async (bot) => {
-                if (confirm(`「${bot.botName}」を削除しますか？この操作は取り消せません。`)) {
+                const confirmed = await showConfirm(
+                  `「${bot.botName}」を削除しますか？この操作は取り消せません。`,
+                  'ボットの削除',
+                  '削除する'
+                );
+                if (confirmed) {
+                  const selectedBotId = (selectedChatbot as any)?.id;
                   setIsDeletingBot(true);
                   try {
                     await api.deleteBot(bot.botId);
@@ -277,12 +285,12 @@ function App() {
                       updatedAt: new Date(b.updatedAt).toISOString()
                     }));
                     setChatbots(botList);
-                    if (selectedChatbot?.id === bot.botId) {
+                    if (selectedBotId === bot.botId) {
                       setSelectedChatbot(null);
                     }
                   } catch (error) {
                     console.error('Failed to delete bot:', error);
-                    alert('ボットの削除に失敗しました');
+                    await showAlert('ボットの削除に失敗しました', 'error');
                   } finally {
                     setIsDeletingBot(false);
                   }
@@ -448,6 +456,14 @@ function App() {
         size="lg"
       />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AlertProvider>
+      <AppContent />
+    </AlertProvider>
   );
 }
 
