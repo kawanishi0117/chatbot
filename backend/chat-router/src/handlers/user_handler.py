@@ -76,6 +76,8 @@ class UserHandler:
                 return self._handle_get_current_user(headers)
             elif http_method == "POST" and path == "/api/auth/logout":
                 return self._handle_logout(headers)
+            elif http_method == "PUT" and path == "/api/auth/profile":
+                return self._handle_update_profile(body, headers)
             else:
                 return create_error_response(404, "Not Found", "Unknown API endpoint")
 
@@ -353,48 +355,12 @@ class UserHandler:
                 "email": user["email"],
                 "name": user["name"],
                 "role": user.get("role", "user"),
-                "createdAt": int(user["createdAt"]) if user["createdAt"] else 0,
-                "updatedAt": int(user["updatedAt"]) if user["updatedAt"] else 0,
-            }
 
-            return create_success_response(response_data)
 
-        except Exception as e:
-            logger.error(f"Error getting current user: {e}")
-            return create_error_response(
-                500, "Internal Server Error", "ユーザー情報の取得に失敗しました"
-            )
 
-    def _handle_logout(self, headers: Dict[str, str]) -> Dict[str, Any]:
-        """ログアウト処理
 
-        Args:
-            headers: リクエストヘッダー
 
-        Returns:
-            ログアウト結果のレスポンス
-        """
-        try:
-            # Authorizationヘッダーからトークンを取得
-            auth_header = headers.get("Authorization", "") or headers.get(
-                "authorization", ""
-            )
-            if not auth_header.startswith("Bearer "):
-                return create_error_response(
-                    401, "Unauthorized", "認証トークンが必要です"
-                )
 
-            token = auth_header.replace("Bearer ", "")
 
-            # セッション情報を削除
-            table.delete_item(Key={"PK": f"SESSION#{token}", "SK": "INFO"})
 
-            logger.info("User logged out successfully")
 
-            return create_success_response({"message": "ログアウトしました"})
-
-        except Exception as e:
-            logger.error(f"Error in logout: {e}")
-            return create_error_response(
-                500, "Internal Server Error", "ログアウトに失敗しました"
-            )
