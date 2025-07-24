@@ -5,6 +5,7 @@ import Login from './components/Login';
 import Sidebar from './components/Sidebar';
 import { api, getToken } from './services/api';
 import { AuthState, Chat, Message } from './types';
+import { AlertProvider } from './contexts/AlertContext';
 
 // デモ用のAI応答生成関数
 const generateAIResponse = (userMessage: string): string => {
@@ -37,7 +38,7 @@ const generateAIResponse = (userMessage: string): string => {
   return responses[Math.floor(Math.random() * responses.length)];
 };
 
-function App() {
+function AppContent() {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
@@ -269,6 +270,14 @@ function App() {
         />
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AlertProvider>
+      <AppContent />
+    </AlertProvider>
   );
 }
 
