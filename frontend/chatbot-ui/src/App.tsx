@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import ChatArea from './components/ChatArea';
 import Header from './components/Header';
+import { LoadingOverlay, LoadingSpinner } from './components/loading';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
 import { api, getToken } from './services/api';
@@ -49,6 +50,8 @@ function AppContent() {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [isUserInfoLoading, setIsUserInfoLoading] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   // 現在のチャットを取得
   const currentChat = chats.find(chat => chat.id === currentChatId) || null;
@@ -94,6 +97,7 @@ function AppContent() {
   const handleLogin = async (_email: string, _password: string) => {
     // Login コンポーネント内で既にAPIを呼び出しているので、
     // ここではユーザー情報を再取得
+    setIsUserInfoLoading(true);
     try {
       const user = await api.getCurrentUser();
       setAuthState({
@@ -107,6 +111,8 @@ function AppContent() {
       });
     } catch (error) {
       console.error('Failed to get user info:', error);
+    } finally {
+      setIsUserInfoLoading(false);
     }
   };
 
@@ -194,14 +200,18 @@ function AppContent() {
         : chat
     ));
 
-    // タイピングインジケーター表示
+    // タイピングインジケーター表示とオーバーレイローディング開始
     setIsTyping(true);
+    setIsSendingMessage(true);
 
-    // AI応答をシミュレート
-    setTimeout(() => {
+    try {
+      // 実際のAPI呼び出し
+      const response = await api.sendMessage(content, targetChatId);
+      
+      // AI応答をチャットに追加
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: generateAIResponse(content),
+        content: response.message || generateAIResponse(content), // APIレスポンスまたはフォールバック
         role: 'assistant',
         timestamp: new Date()
       };
@@ -215,9 +225,30 @@ function AppContent() {
             }
           : chat
       ));
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      
+      // エラー時のフォールバック応答
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: '申し訳ございません。メッセージの送信に失敗しました。もう一度お試しください。',
+        role: 'assistant',
+        timestamp: new Date()
+      };
 
+      setChats(prev => prev.map(chat => 
+        chat.id === targetChatId 
+          ? {
+              ...chat,
+              messages: [...chat.messages, errorMessage],
+              updatedAt: new Date()
+            }
+          : chat
+      ));
+    } finally {
       setIsTyping(false);
-    }, 1000 + Math.random() * 2000); // 1-3秒のランダムな遅延
+      setIsSendingMessage(false);
+    }
   };
 
   // サイドバートグル
@@ -229,7 +260,7 @@ function AppContent() {
   if (authState.isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <LoadingSpinner size="xl" color="primary" />
       </div>
     );
   }
@@ -269,6 +300,20 @@ function AppContent() {
           isTyping={isTyping}
         />
       </div>
+
+      {/* Loading Overlays */}
+      <LoadingOverlay
+        isVisible={isUserInfoLoading}
+        message="ユーザー情報を取得中..."
+        backdrop="dark"
+        size="lg"
+      />
+      <LoadingOverlay
+        isVisible={isSendingMessage}
+        message="メッセージを送信中..."
+        backdrop="dark"
+        size="lg"
+      />
     </div>
   );
 }

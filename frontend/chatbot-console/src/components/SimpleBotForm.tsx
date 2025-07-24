@@ -145,7 +145,7 @@ const SimpleBotForm: React.FC<SimpleBotFormProps> = ({ onSave, onCancel }) => {
           </div>
 
           {/* ボタン */}
-          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
             <button
               type="button"
               onClick={onCancel}

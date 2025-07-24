@@ -1,6 +1,7 @@
 import { Eye, EyeOff, MessageSquare } from 'lucide-react';
 import React, { useState } from 'react';
 import { api } from '../services/api';
+import { LoadingOverlay } from './loading';
 
 interface LoginProps {
   onLogin: (email: string, password: string) => void;
@@ -151,31 +152,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               </div>
             )}
 
-            {!isRegisterMode && (
-              <div className="flex items-center justify-between">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <span className="ml-2 text-sm text-gray-600">ログイン状態を保持</span>
-                </label>
-              </div>
-            )}
-
             <button
               type="submit"
-              disabled={isLoading}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
             >
-              {isLoading ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  {isRegisterMode ? '登録中...' : 'ログイン中...'}
-                </div>
-              ) : (
-                isRegisterMode ? '新規登録' : 'ログイン'
-              )}
+              {isRegisterMode ? '新規登録' : 'ログイン'}
             </button>
           </form>
 
@@ -191,7 +172,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                       setError('');
                       setConfirmPassword('');
                     }}
-                    className="text-blue-600 hover:text-blue-500 font-medium"
+                    className="text-blue-600 hover:text-blue-500 font-medium transition-colors"
                   >
                     ログイン
                   </button>
@@ -205,7 +186,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                       setIsRegisterMode(true);
                       setError('');
                     }}
-                    className="text-blue-600 hover:text-blue-500 font-medium"
+                    className="text-blue-600 hover:text-blue-500 font-medium transition-colors"
                   >
                     新規登録
                   </button>
@@ -215,6 +196,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </div>
         </div>
       </div>
+
+      {/* Loading Overlay */}
+      <LoadingOverlay
+        isVisible={isLoading}
+        message={isRegisterMode ? 'アカウントを作成中...' : 'ログイン中...'}
+        backdrop="dark"
+        size="lg"
+      />
     </div>
   );
 };

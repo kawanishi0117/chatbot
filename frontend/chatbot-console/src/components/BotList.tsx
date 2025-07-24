@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import React from 'react';
 import { BotSettings } from '../types';
+import { LoadingSkeleton } from './loading';
 
 interface BotListProps {
   bots: BotSettings[];
@@ -53,10 +54,38 @@ const BotList: React.FC<BotListProps> = ({
   // ローディング状態
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-8 text-center">
-          <RefreshCw className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-4" />
-          <p className="text-gray-500">ボット一覧を読み込み中...</p>
+      <div className="space-y-6">
+        {/* ヘッダースケルトン */}
+        <div className="flex items-center justify-between">
+          <div>
+            <LoadingSkeleton variant="text" width="120px" className="mb-2" />
+            <LoadingSkeleton variant="text" width="200px" />
+          </div>
+          <LoadingSkeleton variant="rectangular" width="80px" height="36px" />
+        </div>
+
+        {/* カードスケルトン */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <LoadingSkeleton variant="circular" width="48px" height="48px" />
+                  <div>
+                    <LoadingSkeleton variant="text" width="120px" className="mb-2" />
+                    <LoadingSkeleton variant="text" width="80px" />
+                  </div>
+                </div>
+                <LoadingSkeleton variant="circular" width="32px" height="32px" />
+              </div>
+              <LoadingSkeleton variant="text" lines={2} className="mb-4" />
+              <div className="space-y-2">
+                <LoadingSkeleton variant="text" width="100%" />
+                <LoadingSkeleton variant="text" width="100%" />
+                <LoadingSkeleton variant="text" width="100%" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -78,9 +107,9 @@ const BotList: React.FC<BotListProps> = ({
           </p>
           <button
             onClick={onRefresh}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-4 h-4 mr-2" />
             再読み込み
           </button>
         </div>
