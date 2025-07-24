@@ -9,9 +9,9 @@ import Sidebar from './components/Sidebar';
 import SimpleBotForm from './components/SimpleBotForm';
 import UserPanel from './components/UserPanel';
 import WebhookPanel from './components/WebhookPanel';
+import { AlertProvider, useAlert } from './contexts/AlertContext';
 import { api, getToken } from './services/api';
 import { AuthState, ChatbotConfig } from './types';
-import { AlertProvider, useAlert } from './contexts/AlertContext';
 
 function AppContent() {
   const { showAlert, showConfirm } = useAlert();
@@ -155,7 +155,8 @@ function AppContent() {
     try {
       const response = await api.createBot({
         botName: botData.name,
-        description: botData.description
+        description: botData.description,
+        creatorId: authState.user?.id || ''
       });
       
       if (response.botId) {
@@ -260,6 +261,7 @@ function AppContent() {
                   '削除する'
                 );
                 if (confirmed) {
+                  const selectedBotId = (selectedChatbot as any)?.id;
                   try {
                     await api.deleteBot(bot.botId);
                     // ボット削除後、リストを更新
@@ -275,7 +277,7 @@ function AppContent() {
                       updatedAt: new Date(b.updatedAt).toISOString()
                     }));
                     setChatbots(botList);
-                    if (selectedChatbot?.id === bot.botId) {
+                    if (selectedBotId === bot.botId) {
                       setSelectedChatbot(null);
                     }
                   } catch (error) {

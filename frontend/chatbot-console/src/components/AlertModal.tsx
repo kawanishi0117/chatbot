@@ -1,11 +1,11 @@
-import React, { useEffect } from 'react';
 import {
-  AlertTriangle,
-  CheckCircle,
-  Info,
-  X,
-  XCircle,
+	AlertTriangle,
+	CheckCircle,
+	Info,
+	X,
+	XCircle,
 } from 'lucide-react';
+import React, { useEffect } from 'react';
 import { AlertConfig, AlertType } from '../contexts/AlertContext';
 
 interface AlertModalProps {
@@ -30,41 +30,41 @@ const AlertModal: React.FC<AlertModalProps> = ({ config, onClose }) => {
     };
   }, [onClose]);
 
-  // Get icon and colors based on alert type
+  // Get icon, colors, and styles based on alert type
   const getAlertStyles = (alertType: AlertType) => {
     switch (alertType) {
       case 'error':
         return {
           icon: XCircle,
-          iconBgColor: 'bg-red-100',
-          iconColor: 'text-red-600',
-          borderColor: 'border-red-200',
-          bgColor: 'bg-red-50',
+          iconColor: 'text-red-500',
+          titleColor: 'text-red-600',
+          buttonColor: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+          messageBg: 'bg-red-50 border-red-200 text-red-800',
         };
       case 'warning':
         return {
           icon: AlertTriangle,
-          iconBgColor: 'bg-yellow-100',
-          iconColor: 'text-yellow-600',
-          borderColor: 'border-yellow-200',
-          bgColor: 'bg-yellow-50',
+          iconColor: 'text-amber-500',
+          titleColor: 'text-amber-600',
+          buttonColor: 'bg-amber-600 hover:bg-amber-700 focus:ring-amber-500',
+          messageBg: 'bg-amber-50 border-amber-200 text-amber-800',
         };
       case 'success':
         return {
           icon: CheckCircle,
-          iconBgColor: 'bg-green-100',
-          iconColor: 'text-green-600',
-          borderColor: 'border-green-200',
-          bgColor: 'bg-green-50',
+          iconColor: 'text-emerald-500',
+          titleColor: 'text-emerald-600',
+          buttonColor: 'bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500',
+          messageBg: 'bg-emerald-50 border-emerald-200 text-emerald-800',
         };
       case 'info':
       default:
         return {
           icon: Info,
-          iconBgColor: 'bg-blue-100',
-          iconColor: 'text-blue-600',
-          borderColor: 'border-blue-200',
-          bgColor: 'bg-blue-50',
+          iconColor: 'text-blue-500',
+          titleColor: 'text-blue-600',
+          buttonColor: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500',
+          messageBg: 'bg-blue-50 border-blue-200 text-blue-800',
         };
     }
   };
@@ -87,53 +87,56 @@ const AlertModal: React.FC<AlertModalProps> = ({ config, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* オーバーレイ */}
       <div 
-        className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={handleOverlayClick}
-      >
-        {/* オーバーレイ */}
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+      />
 
-        {/* モーダルコンテンツ */}
-        <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full sm:p-6">
-          {/* ヘッダー */}
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center">
-              <div className={`flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full ${styles.iconBgColor}`}>
-                <IconComponent className={`h-6 w-6 ${styles.iconColor}`} />
-              </div>
-              {title && (
-                <h3 className="ml-3 text-lg leading-6 font-medium text-gray-900">
-                  {title}
-                </h3>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <X className="w-6 h-6" />
-            </button>
+      {/* モーダルコンテンツ */}
+      <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-sm sm:max-w-md lg:max-w-lg mx-auto">
+        {/* 閉じるボタン */}
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="absolute top-4 right-4 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {/* メインコンテンツ */}
+        <div className="p-6 sm:p-8 pt-8 sm:pt-10">
+          {/* タイトルとアイコン */}
+          <div className="flex items-center justify-start mb-6 ms-2">
+            <IconComponent className={`w-6 h-6 ${styles.iconColor} mr-2`} />
+            {title ? (
+              <h3 className={`text-lg sm:text-xl font-bold ${styles.titleColor}`}>
+                {title}
+              </h3>
+            ) : (
+              <h3 className={`text-lg sm:text-xl font-bold ${styles.titleColor}`}>
+                {alertType === 'error' ? 'エラー' : 
+                 alertType === 'warning' ? '警告' : 
+                 alertType === 'success' ? '成功' : '情報'}
+              </h3>
+            )}
           </div>
 
           {/* メッセージ */}
-          <div className="mt-3">
-            <div className={`rounded-md p-4 ${styles.bgColor} ${styles.borderColor} border`}>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                {message}
-              </p>
-            </div>
+          <div className={`p-4 mb-6 border ${styles.messageBg}`}>
+            <p className="text-sm sm:text-base whitespace-pre-wrap text-center leading-relaxed">
+              {message}
+            </p>
           </div>
 
           {/* ボタン */}
-          <div className="mt-6 flex justify-end space-x-3">
+          <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
             {type === 'confirm' && (
               <button
                 type="button"
                 onClick={handleCancel}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="w-full sm:w-auto px-6 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors cursor-pointer order-2 sm:order-1"
               >
                 {cancelText}
               </button>
@@ -141,15 +144,7 @@ const AlertModal: React.FC<AlertModalProps> = ({ config, onClose }) => {
             <button
               type="button"
               onClick={handleConfirm}
-              className={`px-4 py-2 text-sm font-medium text-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                alertType === 'error'
-                  ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
-                  : alertType === 'warning'
-                  ? 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500'
-                  : alertType === 'success'
-                  ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500'
-                  : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
-              }`}
+              className={`w-full sm:w-auto px-6 py-3 text-sm font-medium text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors cursor-pointer ${styles.buttonColor} ${type === 'confirm' ? 'order-1 sm:order-2' : ''}`}
             >
               {confirmText}
             </button>
