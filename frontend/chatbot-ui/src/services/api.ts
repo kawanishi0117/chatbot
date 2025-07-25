@@ -113,6 +113,21 @@ class ApiClient {
     removeToken();
   }
 
+  async updateProfile(data: { email?: string; name?: string; password?: string }) {
+    const response = await this.request<{
+      userId: string;
+      email: string;
+      name: string;
+      role: string;
+      createdAt: number;
+      updatedAt: number;
+    }>('/api/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return response;
+  }
+
   // チャット用Webhook API
   async sendMessage(message: string, roomId: string) {
     const response = await this.request<{

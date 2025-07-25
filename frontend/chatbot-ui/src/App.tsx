@@ -251,6 +251,14 @@ function AppContent() {
     }
   };
 
+  // ユーザー情報更新処理
+  const handleUserUpdate = (updatedUser: any) => {
+    setAuthState(prev => ({
+      ...prev,
+      user: updatedUser
+    }));
+  };
+
   // サイドバートグル
   const handleToggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
@@ -278,6 +286,7 @@ function AppContent() {
         onLogout={handleLogout}
         onToggleSidebar={handleToggleSidebar}
         isSidebarOpen={isSidebarOpen}
+        onUserUpdate={handleUserUpdate}
       />
 
       {/* メインコンテンツ */}
