@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import ChatArea from './components/ChatArea';
 import Header from './components/Header';
 import { LoadingOverlay, LoadingSpinner } from './components/loading';
@@ -40,6 +41,9 @@ const generateAIResponse = (userMessage: string): string => {
 };
 
 function AppContent() {
+  const navigate = useNavigate();
+  const { chatId } = useParams();
+  
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
@@ -47,14 +51,13 @@ function AppContent() {
   });
 
   const [chats, setChats] = useState<Chat[]>([]);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isUserInfoLoading, setIsUserInfoLoading] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   // 現在のチャットを取得
-  const currentChat = chats.find(chat => chat.id === currentChatId) || null;
+  const currentChat = chats.find(chat => chat.id === chatId) || null;
 
   // 初期化時にトークンをチェック
   useEffect(() => {
@@ -129,7 +132,7 @@ function AppContent() {
         isLoading: false
       });
       setChats([]);
-      setCurrentChatId(null);
+      navigate('/');
     }
   };
 
@@ -144,13 +147,13 @@ function AppContent() {
     };
     
     setChats(prev => [newChat, ...prev]);
-    setCurrentChatId(newChat.id);
+    navigate(`/chat/${newChat.id}`);
     setIsSidebarOpen(false);
   };
 
   // チャット選択
   const handleSelectChat = (chatId: string) => {
-    setCurrentChatId(chatId);
+    navigate(`/chat/${chatId}`);
     setIsSidebarOpen(false);
   };
 

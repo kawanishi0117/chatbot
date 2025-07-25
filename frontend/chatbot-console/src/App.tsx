@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import BotList from './components/BotList'; // Added BotList import
 import GitHubPanel from './components/GitHubPanel';
 import Header from './components/Header';
@@ -16,6 +17,9 @@ import { AuthState, ChatbotConfig } from './types';
 
 function AppContent() {
   const { showAlert, showConfirm } = useAlert();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
@@ -24,13 +28,26 @@ function AppContent() {
 
   const [chatbots, setChatbots] = useState<ChatbotConfig[]>([]);
   const [selectedChatbot, setSelectedChatbot] = useState<ChatbotConfig | null>(null);
-  const [currentView, setCurrentView] = useState('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCreatingBot, setIsCreatingBot] = useState(false);
   const [isUserInfoLoading, setIsUserInfoLoading] = useState(false);
   const [isSavingBot, setIsSavingBot] = useState(false);
   const [isLoadingBots, setIsLoadingBots] = useState(false);
   const [isDeletingBot, setIsDeletingBot] = useState(false);
+
+  // Get current view from URL path
+  const getCurrentView = () => {
+    const path = location.pathname;
+    if (path === '/' || path === '/overview') return 'overview';
+    if (path === '/bots') return 'bots';
+    if (path === '/github') return 'github';
+    if (path === '/s3') return 's3';
+    if (path === '/webhooks') return 'webhooks';
+    if (path === '/users') return 'users';
+    if (path === '/security') return 'security';
+    if (path === '/create') return 'create';
+    return 'overview';
+  };
 
   // 初期化時にトークンをチェック
   useEffect(() => {
@@ -142,7 +159,7 @@ function AppContent() {
       });
       setChatbots([]);
       setSelectedChatbot(null);
-      setCurrentView('overview');
+      navigate('/bots');
     }
   };
 
@@ -156,7 +173,11 @@ function AppContent() {
 
   const handleSelectChatbot = (chatbot: ChatbotConfig | null) => {
     setSelectedChatbot(chatbot);
-    setCurrentView('overview');
+    if (chatbot) {
+      navigate('/overview');
+    } else {
+      navigate('/bots');
+    }
     setIsSidebarOpen(false);
   };
 
@@ -166,7 +187,7 @@ function AppContent() {
 
   // 新しいチャットボット作成
   const handleCreateChatbot = () => {
-    setIsCreatingBot(true);
+    navigate('/create');
   };
 
   // チャットボット作成の保存処理
@@ -194,7 +215,7 @@ function AppContent() {
         
         setChatbots(prev => [newBot, ...prev]);
         setSelectedChatbot(newBot);
-        setCurrentView('overview');
+        navigate('/overview');
         setIsCreatingBot(false);
       }
     } catch (error) {
@@ -233,170 +254,181 @@ function AppContent() {
     handleUpdateChatbot({ s3Folder });
   };
 
-  const renderCurrentView = () => {
-    // ボット作成フォームを表示
-    if (isCreatingBot) {
-      return (
-        <div className="h-full">
-          <SimpleBotForm
-            onCancel={() => setIsCreatingBot(false)}
-            onSave={handleSaveNewChatbot}
-          />
-        </div>
-      );
-    }
+  // Route Components
+  const CreateBotRoute = () => (
+    <div className="h-full">
+      <SimpleBotForm
+        onCancel={() => navigate('/bots')}
+        onSave={handleSaveNewChatbot}
+      />
+    </div>
+  );
 
-    // ボット一覧を表示（ボットが選択されていない場合やボット一覧ビューの場合）
-    if (!selectedChatbot || currentView === 'bots') {
-      return (
-        <div className="h-full">
-          <div className="max-w-5xl mx-auto px-4 py-4">
-            <BotList
-              bots={chatbots.map(bot => ({
-                botId: bot.id,
-                botName: bot.name,
+  const BotsRoute = () => (
+    <div className="h-full">
+      <div className="max-w-5xl mx-auto px-4 py-4">
+        <BotList
+          bots={chatbots.map(bot => ({
+            botId: bot.id,
+            botName: bot.name,
+            description: bot.description,
+            isActive: bot.isActive,
+            creatorId: authState.user?.id || '',
+            createdAt: new Date(bot.createdAt).getTime(),
+            updatedAt: new Date(bot.updatedAt).getTime()
+          }))}
+          loading={isLoadingBots}
+          onEdit={(bot) => {
+            const chatbot = chatbots.find(c => c.id === bot.botId);
+            if (chatbot) {
+              setSelectedChatbot(chatbot);
+              navigate('/overview');
+            }
+          }}
+          onDelete={async (bot) => {
+            const confirmed = await showConfirm(
+              `「${bot.botName}」を削除しますか？この操作は取り消せません。`,
+              'ボットの削除',
+              '削除する'
+            );
+            if (confirmed) {
+              const selectedBotId = (selectedChatbot as any)?.id;
+              setIsDeletingBot(true);
+              try {
+                await api.deleteBot(bot.botId);
+                // ボット削除後、リストを更新
+                const response = await api.getBots();
+                const botList = response.bots.map(b => ({
+                  id: b.botId,
+                  name: b.botName,
+                  description: b.description,
+                  githubRepo: '',
+                  s3Folder: '',
+                  isActive: b.isActive,
+                  createdAt: new Date(b.createdAt).toISOString(),
+                  updatedAt: new Date(b.updatedAt).toISOString()
+                }));
+                setChatbots(botList);
+                if (selectedBotId === bot.botId) {
+                  setSelectedChatbot(null);
+                }
+              } catch (error) {
+                console.error('Failed to delete bot:', error);
+                await showAlert('ボットの削除に失敗しました', 'error');
+              } finally {
+                setIsDeletingBot(false);
+              }
+            }
+          }}
+          onRefresh={async () => {
+            setIsLoadingBots(true);
+            try {
+              const response = await api.getBots();
+              const botList = response.bots.map(bot => ({
+                id: bot.botId,
+                name: bot.botName,
                 description: bot.description,
+                githubRepo: '',
+                s3Folder: '',
                 isActive: bot.isActive,
-                creatorId: authState.user?.id || '',
-                createdAt: new Date(bot.createdAt).getTime(),
-                updatedAt: new Date(bot.updatedAt).getTime()
-              }))}
-              loading={isLoadingBots}
-              onEdit={(bot) => {
-                const chatbot = chatbots.find(c => c.id === bot.botId);
-                if (chatbot) {
-                  setSelectedChatbot(chatbot);
-                  setCurrentView('overview');
-                }
-              }}
-              onDelete={async (bot) => {
-                const confirmed = await showConfirm(
-                  `「${bot.botName}」を削除しますか？この操作は取り消せません。`,
-                  'ボットの削除',
-                  '削除する'
-                );
-                if (confirmed) {
-                  const selectedBotId = (selectedChatbot as any)?.id;
-                  setIsDeletingBot(true);
-                  try {
-                    await api.deleteBot(bot.botId);
-                    // ボット削除後、リストを更新
-                    const response = await api.getBots();
-                    const botList = response.bots.map(b => ({
-                      id: b.botId,
-                      name: b.botName,
-                      description: b.description,
-                      githubRepo: '',
-                      s3Folder: '',
-                      isActive: b.isActive,
-                      createdAt: new Date(b.createdAt).toISOString(),
-                      updatedAt: new Date(b.updatedAt).toISOString()
-                    }));
-                    setChatbots(botList);
-                    if (selectedBotId === bot.botId) {
-                      setSelectedChatbot(null);
-                    }
-                  } catch (error) {
-                    console.error('Failed to delete bot:', error);
-                    await showAlert('ボットの削除に失敗しました', 'error');
-                  } finally {
-                    setIsDeletingBot(false);
-                  }
-                }
-              }}
-              onRefresh={async () => {
-                setIsLoadingBots(true);
-                try {
-                  const response = await api.getBots();
-                  const botList = response.bots.map(bot => ({
-                    id: bot.botId,
-                    name: bot.botName,
-                    description: bot.description,
-                    githubRepo: '',
-                    s3Folder: '',
-                    isActive: bot.isActive,
-                    createdAt: new Date(bot.createdAt).toISOString(),
-                    updatedAt: new Date(bot.updatedAt).toISOString()
-                  }));
-                  setChatbots(botList);
-                } catch (error) {
-                  console.error('Failed to refresh bots:', error);
-                } finally {
-                  setIsLoadingBots(false);
-                }
-              }}
-            />
-          </div>
-        </div>
-      );
-    }
+                createdAt: new Date(bot.createdAt).toISOString(),
+                updatedAt: new Date(bot.updatedAt).toISOString()
+              }));
+              setChatbots(botList);
+            } catch (error) {
+              console.error('Failed to refresh bots:', error);
+            } finally {
+              setIsLoadingBots(false);
+            }
+          }}
+        />
+      </div>
+    </div>
+  );
 
-    switch (currentView) {
-      case 'overview':
-        return (
-          <div className="h-full">
-            <OverviewPanel
-              chatbot={selectedChatbot}
-              onEdit={() => setCurrentView('github')}
-              onToggleStatus={handleToggleChatbotStatus}
-            />
-          </div>
-        );
-      case 'github':
-        return (
-          <div className="h-full">
-            <GitHubPanel
-              chatbot={selectedChatbot}
-              onSave={handleSaveGitHubRepo}
-            />
-          </div>
-        );
-      case 's3':
-        return (
-          <div className="h-full">
-            <S3Panel
-              chatbot={selectedChatbot}
-              onSave={handleSaveS3Folder}
-            />
-          </div>
-        );
-      case 'webhooks':
-        return (
-          <div className="h-full">
-            <WebhookPanel
-              chatbot={selectedChatbot}
-              onSave={(webhooks) => console.log('Webhooks saved:', webhooks)}
-            />
-          </div>
-        );
-      case 'users':
-        return (
-          <div className="h-full">
-            <UserPanel
-              chatbot={selectedChatbot}
-              onSave={(userAccess) => console.log('User access saved:', userAccess)}
-            />
-          </div>
-        );
-      case 'security':
-        return (
-          <div className="h-full p-6">
-            <div className="text-center text-gray-500">
-              <h2 className="text-xl font-semibold mb-2">セキュリティ設定</h2>
-              <p>このパネルは開発中です</p>
-            </div>
-          </div>
-        );
-      default:
-        return (
-          <div className="h-full p-6">
-            <div className="text-center text-gray-500">
-              <h2 className="text-xl font-semibold mb-2">不明なビュー</h2>
-              <p>指定されたビューが見つかりません</p>
-            </div>
-          </div>
-        );
+  const OverviewRoute = () => {
+    if (!selectedChatbot) {
+      return <Navigate to="/bots" replace />;
     }
+    return (
+      <div className="h-full">
+        <OverviewPanel
+          chatbot={selectedChatbot}
+          onEdit={() => navigate('/github')}
+          onToggleStatus={handleToggleChatbotStatus}
+        />
+      </div>
+    );
+  };
+
+  const GitHubRoute = () => {
+    if (!selectedChatbot) {
+      return <Navigate to="/bots" replace />;
+    }
+    return (
+      <div className="h-full">
+        <GitHubPanel
+          chatbot={selectedChatbot}
+          onSave={handleSaveGitHubRepo}
+        />
+      </div>
+    );
+  };
+
+  const S3Route = () => {
+    if (!selectedChatbot) {
+      return <Navigate to="/bots" replace />;
+    }
+    return (
+      <div className="h-full">
+        <S3Panel
+          chatbot={selectedChatbot}
+          onSave={handleSaveS3Folder}
+        />
+      </div>
+    );
+  };
+
+  const WebhooksRoute = () => {
+    if (!selectedChatbot) {
+      return <Navigate to="/bots" replace />;
+    }
+    return (
+      <div className="h-full">
+        <WebhookPanel
+          chatbot={selectedChatbot}
+          onSave={(webhooks) => console.log('Webhooks saved:', webhooks)}
+        />
+      </div>
+    );
+  };
+
+  const UsersRoute = () => {
+    if (!selectedChatbot) {
+      return <Navigate to="/bots" replace />;
+    }
+    return (
+      <div className="h-full">
+        <UserPanel
+          chatbot={selectedChatbot}
+          onSave={(userAccess) => console.log('User access saved:', userAccess)}
+        />
+      </div>
+    );
+  };
+
+  const SecurityRoute = () => {
+    if (!selectedChatbot) {
+      return <Navigate to="/bots" replace />;
+    }
+    return (
+      <div className="h-full p-6">
+        <div className="text-center text-gray-500">
+          <h2 className="text-xl font-semibold mb-2">セキュリティ設定</h2>
+          <p>このパネルは開発中です</p>
+        </div>
+      </div>
+    );
   };
 
   if (authState.isLoading) {
@@ -428,13 +460,23 @@ function AppContent() {
           selectedChatbot={selectedChatbot}
           onSelectChatbot={handleSelectChatbot}
           onCreateChatbot={handleCreateChatbot}
-          currentView={currentView}
-          onViewChange={setCurrentView}
+          currentView={getCurrentView()}
+          onViewChange={(view) => navigate(`/${view}`)}
         />
         
         <main className="flex-1">
           <div className="h-full overflow-y-auto scrollbar-thin">
-            {renderCurrentView()}
+            <Routes>
+              <Route path="/" element={<Navigate to="/bots" replace />} />
+              <Route path="/bots" element={<BotsRoute />} />
+              <Route path="/create" element={<CreateBotRoute />} />
+              <Route path="/overview" element={<OverviewRoute />} />
+              <Route path="/github" element={<GitHubRoute />} />
+              <Route path="/s3" element={<S3Route />} />
+              <Route path="/webhooks" element={<WebhooksRoute />} />
+              <Route path="/users" element={<UsersRoute />} />
+              <Route path="/security" element={<SecurityRoute />} />
+            </Routes>
           </div>
         </main>
       </div>

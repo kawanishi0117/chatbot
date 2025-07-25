@@ -10,6 +10,7 @@ import {
     Webhook
 } from 'lucide-react';
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChatbotConfig } from '../types';
 
 interface SidebarProps {
@@ -31,6 +32,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentView,
   onViewChange
 }) => {
+  const navigate = useNavigate();
+  
   const menuItems = selectedChatbot ? [
     { id: 'overview', label: '概要', icon: Activity },
     { id: 'github', label: 'GitHub設定', icon: Github },
@@ -147,7 +150,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                           key={chatbot.id}
                           onClick={() => {
                             onSelectChatbot(chatbot);
-                            onViewChange('overview');
+                            navigate('/overview');
                           }}
                           className={`
                             w-full text-left p-3 rounded-lg transition-all
