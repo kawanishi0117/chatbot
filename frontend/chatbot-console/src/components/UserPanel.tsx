@@ -1,79 +1,71 @@
 import {
-	Calendar,
-	Edit,
-	Eye,
-	Filter,
-	Plus,
-	Search,
-	Shield,
-	Trash2,
-	Users
+    Calendar,
+    Copy,
+    Edit,
+    Eye,
+    Filter,
+    Plus,
+    Search,
+    Shield,
+    Trash2,
+    Users
 } from 'lucide-react';
-import React, { useState } from 'react';
-import { ChatbotConfig, User, UserAccess } from '../types';
+import React, { useContext, useEffect, useState } from 'react';
+import { AlertContext } from '../contexts/AlertContext';
+import { api } from '../services/api';
+import { ChatbotConfig, UserAccess } from '../types';
+import { LoadingOverlay } from './loading';
 
 interface UserPanelProps {
   chatbot: ChatbotConfig;
   onSave: (userAccess: UserAccess[]) => void;
 }
 
+interface BotUser {
+  id: string;
+  chatbotId: string;
+  userId: string;
+  permission: 'read' | 'write' | 'admin';
+  createdAt: number;
+  updatedAt: number;
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    createdAt: number;
+    updatedAt: number;
+  };
+}
+
 const UserPanel: React.FC<UserPanelProps> = ({ chatbot, onSave }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [permissionFilter, setPermissionFilter] = useState<string>('all');
   const [isInviting, setIsInviting] = useState(false);
-  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editingUser, setEditingUser] = useState<BotUser | null>(null);
+  const [userAccess, setUserAccess] = useState<BotUser[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [invitationUrl, setInvitationUrl] = useState<string>('');
+  const [showInvitationUrl, setShowInvitationUrl] = useState(false);
 
-  // デモ用のユーザーデータ
-  const [userAccess, setUserAccess] = useState<(UserAccess & { user: User })[]>([
-    {
-      id: '1',
-      chatbotId: chatbot.id,
-      userId: 'user1',
-      permission: 'admin',
-      createdAt: '2024-01-15T10:30:00Z',
-      updatedAt: '2024-01-15T10:30:00Z',
-      user: {
-        id: 'user1',
-        email: 'admin@example.com',
-        name: '管理者',
-        role: 'admin',
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-15T10:30:00Z'
-      }
-    },
-    {
-      id: '2',
-      chatbotId: chatbot.id,
-      userId: 'user2',
-      permission: 'write',
-      createdAt: '2024-01-14T16:20:00Z',
-      updatedAt: '2024-01-14T16:20:00Z',
-      user: {
-        id: 'user2',
-        email: 'editor@example.com',
-        name: '編集者',
-        role: 'user',
-        createdAt: '2024-01-10T00:00:00Z',
-        updatedAt: '2024-01-14T16:20:00Z'
-      }
-    },
-    {
-      id: '3',
-      chatbotId: chatbot.id,
-      userId: 'user3',
-      permission: 'read',
-      createdAt: '2024-01-13T09:15:00Z',
-      updatedAt: '2024-01-13T09:15:00Z',
-      user: {
-        id: 'user3',
-        email: 'viewer@example.com',
-        name: '閲覧者',
-        role: 'user',
-        createdAt: '2024-01-05T00:00:00Z',
-        updatedAt: '2024-01-13T09:15:00Z'
-      }
+  const { showAlert } = useContext(AlertContext);
+
+  // ユーザー一覧を取得
+  const loadUsers = async () => {
+    try {
+      setIsLoading(true);
+      const users = await api.getBotUsers(chatbot.id);
+      setUserAccess(users);
+    } catch (error: any) {
+      showAlert('ユーザー一覧の取得に失敗しました: ' + (error.message || 'Unknown error'), 'error');
+    } finally {
+      setIsLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    loadUsers();
+  }, [chatbot.id]);
 
   const filteredUsers = userAccess.filter(access => {
     const matchesSearch = 
@@ -103,42 +95,73 @@ const UserPanel: React.FC<UserPanelProps> = ({ chatbot, onSave }) => {
     }
   };
 
-  const handleUpdatePermission = (accessId: string, newPermission: string) => {
-    setUserAccess(prev => 
-      prev.map(access => 
-        access.id === accessId 
-          ? { ...access, permission: newPermission as any, updatedAt: new Date().toISOString() }
-          : access
-      )
-    );
+  const handleUpdatePermission = async (userId: string, newPermission: 'read' | 'write' | 'admin') => {
+    try {
+      setIsLoading(true);
+      await api.updateUserPermission(chatbot.id, userId, newPermission);
+      showAlert('ユーザー権限を更新しました', 'success');
+      await loadUsers(); // ユーザー一覧を再読み込み
+      setEditingUser(null);
+    } catch (error: any) {
+      showAlert('権限更新に失敗しました: ' + (error.message || 'Unknown error'), 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleRemoveUser = (accessId: string) => {
-    setUserAccess(prev => prev.filter(access => access.id !== accessId));
+  const handleRemoveUser = async (userId: string) => {
+    if (!confirm('このユーザーのアクセス権を削除しますか？')) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await api.removeUserFromBot(chatbot.id, userId);
+      showAlert('ユーザーを削除しました', 'success');
+      await loadUsers(); // ユーザー一覧を再読み込み
+    } catch (error: any) {
+      showAlert('ユーザー削除に失敗しました: ' + (error.message || 'Unknown error'), 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleInviteUser = (e: React.FormEvent) => {
-    e.preventDefault();
-    // デモ用の招待処理
-    console.log('User invited');
-    setIsInviting(false);
+  const handleInviteUser = async (email: string, permission: 'read' | 'write' | 'admin') => {
+    try {
+      setIsLoading(true);
+      const response = await api.createInvitation(chatbot.id, email, permission);
+      const fullUrl = `${window.location.origin}/invite/${response.invitationId}`;
+      setInvitationUrl(fullUrl);
+      setShowInvitationUrl(true);
+      showAlert('招待リンクを作成しました', 'success');
+      setIsInviting(false);
+    } catch (error: any) {
+      showAlert('招待リンクの作成に失敗しました: ' + (error.message || 'Unknown error'), 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleViewUser = (user: User) => {
+  const handleViewUser = (user: BotUser['user']) => {
     // デモ用のユーザー詳細表示
-    console.log('View user:', user);
+    showAlert(`ユーザー詳細: ${user.name} (${user.email})`, 'info');
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ja-JP');
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleDateString('ja-JP');
   };
 
-  const InviteUserForm: React.FC<{ onSave: (email: string, permission: string) => void; onCancel: () => void }> = ({ 
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    showAlert('クリップボードにコピーしました', 'success');
+  };
+
+  const InviteUserForm: React.FC<{ onSave: (email: string, permission: 'read' | 'write' | 'admin') => void; onCancel: () => void }> = ({ 
     onSave, 
     onCancel 
   }) => {
     const [email, setEmail] = useState('');
-    const [permission, setPermission] = useState('read');
+    const [permission, setPermission] = useState<'read' | 'write' | 'admin'>('read');
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
@@ -172,7 +195,7 @@ const UserPanel: React.FC<UserPanelProps> = ({ chatbot, onSave }) => {
             </label>
             <select
               value={permission}
-              onChange={(e) => setPermission(e.target.value)}
+              onChange={(e) => setPermission(e.target.value as 'read' | 'write' | 'admin')}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="read">閲覧者 - チャットボットの利用のみ</option>
@@ -203,6 +226,8 @@ const UserPanel: React.FC<UserPanelProps> = ({ chatbot, onSave }) => {
 
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
+      {isLoading && <LoadingOverlay />}
+      
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* ヘッダー */}
         <div className="flex items-center justify-between">
@@ -221,6 +246,35 @@ const UserPanel: React.FC<UserPanelProps> = ({ chatbot, onSave }) => {
             <span>ユーザーを招待</span>
           </button>
         </div>
+
+        {/* 招待URL表示 */}
+        {showInvitationUrl && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-green-900 mb-3">招待リンクを作成しました</h3>
+            <p className="text-sm text-green-800 mb-4">このリンクを共有してユーザーを招待してください：</p>
+            <div className="flex items-center space-x-2 bg-white border border-green-300 rounded-lg p-3">
+              <input
+                type="text"
+                value={invitationUrl}
+                readOnly
+                className="flex-1 bg-transparent border-none outline-none text-sm"
+              />
+              <button
+                onClick={() => copyToClipboard(invitationUrl)}
+                className="p-2 text-green-600 hover:bg-green-100 rounded-lg"
+                title="コピー"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+            </div>
+            <button
+              onClick={() => setShowInvitationUrl(false)}
+              className="mt-3 text-sm text-green-600 hover:text-green-800"
+            >
+              閉じる
+            </button>
+          </div>
+        )}
 
         {/* 検索とフィルター */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
@@ -253,56 +307,41 @@ const UserPanel: React.FC<UserPanelProps> = ({ chatbot, onSave }) => {
 
         {/* ユーザー招待フォーム */}
         {isInviting && (
+          <InviteUserForm
+            onSave={handleInviteUser}
+            onCancel={() => setIsInviting(false)}
+          />
+        )}
+
+        {/* 権限編集モーダル */}
+        {editingUser && (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">新しいユーザーを招待</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              {editingUser.user.name} の権限を変更
+            </h3>
+            <div className="space-y-3">
+              {(['read', 'write', 'admin'] as const).map((permission) => (
+                <label key={permission} className="flex items-center space-x-3">
+                  <input
+                    type="radio"
+                    name="permission"
+                    value={permission}
+                    checked={editingUser.permission === permission}
+                    onChange={() => handleUpdatePermission(editingUser.userId, permission)}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <span className="text-sm">{getPermissionLabel(permission)}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex space-x-3 mt-6">
               <button
-                onClick={() => setIsInviting(false)}
-                className="text-gray-400 hover:text-gray-600"
+                onClick={() => setEditingUser(null)}
+                className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
               >
-                ×
+                キャンセル
               </button>
             </div>
-            <form onSubmit={handleInviteUser} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    メールアドレス
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="user@example.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    権限レベル
-                  </label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="read">閲覧者</option>
-                    <option value="write">編集者</option>
-                    <option value="admin">管理者</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setIsInviting(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  招待を送信
-                </button>
-              </div>
-            </form>
           </div>
         )}
 
@@ -361,7 +400,7 @@ const UserPanel: React.FC<UserPanelProps> = ({ chatbot, onSave }) => {
                       <Eye className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleRemoveUser(userAccess.id)}
+                      onClick={() => handleRemoveUser(userAccess.userId)}
                       className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       title="削除"
                     >

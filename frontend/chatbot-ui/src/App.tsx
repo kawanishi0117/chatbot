@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import ChatArea from './components/ChatArea';
 import Header from './components/Header';
+import InvitationAccept from './components/InvitationAccept';
 import { LoadingOverlay, LoadingSpinner } from './components/loading';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
+import { AlertProvider } from './contexts/AlertContext';
 import { api, getToken } from './services/api';
 import { AuthState, Chat, Message } from './types';
-import { AlertProvider } from './contexts/AlertContext';
 
 // デモ用のAI応答生成関数
 const generateAIResponse = (userMessage: string): string => {
@@ -39,7 +41,7 @@ const generateAIResponse = (userMessage: string): string => {
   return responses[Math.floor(Math.random() * responses.length)];
 };
 
-function AppContent() {
+function MainApp() {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
@@ -330,7 +332,12 @@ function AppContent() {
 function App() {
   return (
     <AlertProvider>
-      <AppContent />
+      <Router>
+        <Routes>
+          <Route path="/invite/:invitationId" element={<InvitationAccept />} />
+          <Route path="/*" element={<MainApp />} />
+        </Routes>
+      </Router>
     </AlertProvider>
   );
 }

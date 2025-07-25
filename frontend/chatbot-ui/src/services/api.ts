@@ -146,6 +146,38 @@ class ApiClient {
     });
     return response;
   }
+
+  // 招待API
+  async getInvitation(invitationId: string) {
+    const response = await this.request<{
+      invitationId: string;
+      botId: string;
+      email: string;
+      permission: string;
+      inviterEmail: string;
+      createdAt: number;
+      expiresAt: number;
+    }>(`/api/invitations/${invitationId}`, {
+      method: 'GET',
+    });
+    return response;
+  }
+
+  async acceptInvitation(invitationId: string) {
+    const response = await this.request<{
+      message: string;
+      botId: string;
+      permission: string;
+      user: {
+        userId: string;
+        email: string;
+        name: string;
+      };
+    }>(`/api/invitations/${invitationId}/accept`, {
+      method: 'POST',
+    });
+    return response;
+  }
 }
 
 // APIクライアントのインスタンスをエクスポート

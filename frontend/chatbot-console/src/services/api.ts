@@ -213,6 +213,98 @@ class ApiClient {
     });
     return response;
   }
+
+  // ユーザー管理API
+  async getBotUsers(botId: string) {
+    const response = await this.request<Array<{
+      id: string;
+      chatbotId: string;
+      userId: string;
+      permission: 'read' | 'write' | 'admin';
+      createdAt: number;
+      updatedAt: number;
+      user: {
+        id: string;
+        email: string;
+        name: string;
+        role: string;
+        createdAt: number;
+        updatedAt: number;
+      };
+    }>>(`/api/bots/${botId}/users`, {
+      method: 'GET',
+    });
+    return response;
+  }
+
+  async createInvitation(botId: string, email: string, permission: 'read' | 'write' | 'admin') {
+    const response = await this.request<{
+      invitationId: string;
+      invitationUrl: string;
+      email: string;
+      permission: string;
+      expiresAt: number;
+    }>(`/api/bots/${botId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ email, permission }),
+    });
+    return response;
+  }
+
+  async getInvitation(invitationId: string) {
+    const response = await this.request<{
+      invitationId: string;
+      botId: string;
+      email: string;
+      permission: string;
+      inviterEmail: string;
+      createdAt: number;
+      expiresAt: number;
+    }>(`/api/invitations/${invitationId}`, {
+      method: 'GET',
+    });
+    return response;
+  }
+
+  async acceptInvitation(invitationId: string) {
+    const response = await this.request<{
+      message: string;
+      botId: string;
+      permission: string;
+      user: {
+        userId: string;
+        email: string;
+        name: string;
+      };
+    }>(`/api/invitations/${invitationId}/accept`, {
+      method: 'POST',
+    });
+    return response;
+  }
+
+  async updateUserPermission(botId: string, userId: string, permission: 'read' | 'write' | 'admin') {
+    const response = await this.request<{
+      message: string;
+      userId: string;
+      botId: string;
+      permission: string;
+    }>(`/api/bots/${botId}/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ permission }),
+    });
+    return response;
+  }
+
+  async removeUserFromBot(botId: string, userId: string) {
+    const response = await this.request<{
+      message: string;
+      userId: string;
+      botId: string;
+    }>(`/api/bots/${botId}/users/${userId}`, {
+      method: 'DELETE',
+    });
+    return response;
+  }
 }
 
 // APIクライアントのインスタンスをエクスポート

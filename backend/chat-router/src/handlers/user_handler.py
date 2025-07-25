@@ -92,6 +92,29 @@ class UserHandler:
                 return self._handle_update_profile(body, headers)
             elif http_method == "POST" and path == "/api/auth/logout":
                 return self._handle_logout(headers)
+            # ユーザー管理機能
+            elif http_method == "GET" and path.startswith("/api/bots/") and path.endswith("/users"):
+                bot_id = path.split("/")[-2]
+                return self._handle_get_bot_users(bot_id, headers)
+            elif http_method == "POST" and path.startswith("/api/bots/") and path.endswith("/invite"):
+                bot_id = path.split("/")[-2]
+                return self._handle_create_invitation(bot_id, body, headers)
+            elif http_method == "GET" and path.startswith("/api/invitations/"):
+                invitation_id = path.split("/")[-1]
+                return self._handle_get_invitation(invitation_id)
+            elif http_method == "POST" and path.startswith("/api/invitations/") and path.endswith("/accept"):
+                invitation_id = path.split("/")[-2]
+                return self._handle_accept_invitation(invitation_id, headers)
+            elif http_method == "PUT" and path.startswith("/api/bots/") and "/users/" in path:
+                path_parts = path.split("/")
+                bot_id = path_parts[3]
+                user_id = path_parts[5]
+                return self._handle_update_user_permission(bot_id, user_id, body, headers)
+            elif http_method == "DELETE" and path.startswith("/api/bots/") and "/users/" in path:
+                path_parts = path.split("/")
+                bot_id = path_parts[3]
+                user_id = path_parts[5]
+                return self._handle_remove_user_from_bot(bot_id, user_id, headers)
             else:
                 return create_error_response(404, "Not Found", "Unknown API endpoint")
 
@@ -547,3 +570,418 @@ class UserHandler:
             return create_error_response(
                 500, "Internal Server Error", "ログアウトに失敗しました"
             )
+
+    def _authenticate_user(self, headers: Dict[str, str]) -> Optional[Dict[str, Any]]:
+        """ユーザー認証チェック
+
+        Args:
+            headers: リクエストヘッダー
+
+        Returns:
+            認証されたユーザー情報、または None
+        """
+        try:
+            # Authorizationヘッダーからトークンを取得
+            auth_header = headers.get("Authorization", "") or headers.get("authorization", "")
+            if not auth_header.startswith("Bearer "):
+                return None
+
+            token = auth_header.replace("Bearer ", "")
+
+            # セッション情報を取得
+            session_response = table.get_item(Key={"PK": f"SESSION#{token}", "SK": "INFO"})
+            if "Item" not in session_response:
+                return None
+
+            session = session_response["Item"]
+
+            # セッションの有効期限チェック
+            current_time = int(time.time())
+            if session.get("expiresAt", 0) < current_time:
+                return None
+
+            # ユーザー情報を取得
+            user_response = table.get_item(Key={"PK": f"USER#{session['email']}", "SK": "PROFILE"})
+            if "Item" not in user_response:
+                return None
+
+            return user_response["Item"]
+
+        except Exception as e:
+            logger.error(f"Error in authentication: {e}")
+            return None
+
+    def _handle_get_bot_users(self, bot_id: str, headers: Dict[str, str]) -> Dict[str, Any]:
+        """ボットのユーザー一覧取得
+
+        Args:
+            bot_id: ボットID
+            headers: リクエストヘッダー
+
+        Returns:
+            ユーザー一覧のレスポンス
+        """
+        try:
+            # 認証チェック
+            current_user = self._authenticate_user(headers)
+            if not current_user:
+                return create_error_response(401, "Unauthorized", "認証が必要です")
+
+            # ボットのユーザー一覧を取得
+            response = table.query(
+                KeyConditionExpression="PK = :pk AND begins_with(SK, :sk)",
+                ExpressionAttributeValues={
+                    ":pk": f"BOT#{bot_id}",
+                    ":sk": "ACCESS#"
+                }
+            )
+
+            users_with_access = []
+            for item in response.get("Items", []):
+                user_id = item["SK"].replace("ACCESS#", "")
+                
+                # ユーザー情報を取得するために、userIdからemailを特定し、PK="USER#{email}", SK="PROFILE"で取得
+                # まず、全てのユーザーから該当するuserIdを検索
+                user_info = None
+                try:
+                    # userIdから対応するユーザー情報を取得するため、スキャン操作を実行
+                    scan_response = table.scan(
+                        FilterExpression="SK = :sk AND userId = :user_id",
+                        ExpressionAttributeValues={
+                            ":sk": "PROFILE",
+                            ":user_id": user_id
+                        }
+                    )
+                    
+                    if scan_response.get("Items"):
+                        user_info = scan_response["Items"][0]
+                except Exception as e:
+                    logger.warning(f"Failed to get user info for {user_id}: {e}")
+                    continue
+                
+                if user_info:
+                    users_with_access.append({
+                        "id": item.get("accessId", str(uuid.uuid4())),
+                        "chatbotId": bot_id,
+                        "userId": user_id,
+                        "permission": item.get("permission", "read"),
+                        "createdAt": item.get("createdAt", int(time.time() * 1000)),
+                        "updatedAt": item.get("updatedAt", int(time.time() * 1000)),
+                        "user": {
+                            "id": user_id,
+                            "email": user_info.get("email", ""),
+                            "name": user_info.get("name", ""),
+                            "role": user_info.get("role", "user"),
+                            "createdAt": user_info.get("createdAt", int(time.time() * 1000)),
+                            "updatedAt": user_info.get("updatedAt", int(time.time() * 1000))
+                        }
+                    })
+
+            logger.info(f"Retrieved {len(users_with_access)} users for bot {bot_id}")
+            return create_success_response(users_with_access)
+
+        except Exception as e:
+            logger.error(f"Error getting bot users: {e}")
+            return create_error_response(500, "Internal Server Error", "ユーザー一覧の取得に失敗しました")
+
+    def _handle_create_invitation(self, bot_id: str, body: Union[str, Dict], headers: Dict[str, str]) -> Dict[str, Any]:
+        """招待リンク作成
+
+        Args:
+            bot_id: ボットID
+            body: リクエストボディ
+            headers: リクエストヘッダー
+
+        Returns:
+            招待リンクのレスポンス
+        """
+        try:
+            # 認証チェック
+            current_user = self._authenticate_user(headers)
+            if not current_user:
+                return create_error_response(401, "Unauthorized", "認証が必要です")
+
+            # リクエストボディをパース
+            if isinstance(body, str):
+                data = json.loads(body)
+            else:
+                data = body
+
+            email = data.get("email", "").lower()
+            permission = data.get("permission", "read")
+
+            # バリデーション
+            if not email or "@" not in email:
+                return create_error_response(400, "Bad Request", "有効なメールアドレスが必要です")
+
+            if permission not in ["read", "write", "admin"]:
+                return create_error_response(400, "Bad Request", "無効な権限レベルです")
+
+            # 招待IDを生成
+            invitation_id = str(uuid.uuid4())
+            current_time = int(time.time() * 1000)
+            expiry_time = int(time.time()) + (7 * 24 * 60 * 60)  # 7日後
+
+            # 招待情報を保存
+            invitation_data = {
+                "PK": f"INVITATION#{invitation_id}",
+                "SK": "INFO",
+                "invitationId": invitation_id,
+                "botId": bot_id,
+                "email": email,
+                "permission": permission,
+                "inviterId": current_user["userId"],
+                "inviterEmail": current_user["email"],
+                "createdAt": current_time,
+                "expiresAt": expiry_time,
+                "ttl": expiry_time,
+                "isUsed": False
+            }
+
+            table.put_item(Item=invitation_data)
+
+            logger.info(f"Invitation created: {invitation_id} for {email}")
+
+            return create_success_response({
+                "invitationId": invitation_id,
+                "invitationUrl": f"/invite/{invitation_id}",
+                "email": email,
+                "permission": permission,
+                "expiresAt": expiry_time * 1000
+            })
+
+        except json.JSONDecodeError:
+            return create_error_response(400, "Bad Request", "Invalid JSON format")
+        except Exception as e:
+            logger.error(f"Error creating invitation: {e}")
+            return create_error_response(500, "Internal Server Error", "招待リンクの作成に失敗しました")
+
+    def _handle_get_invitation(self, invitation_id: str) -> Dict[str, Any]:
+        """招待情報取得
+
+        Args:
+            invitation_id: 招待ID
+
+        Returns:
+            招待情報のレスポンス
+        """
+        try:
+            # 招待情報を取得
+            response = table.get_item(Key={"PK": f"INVITATION#{invitation_id}", "SK": "INFO"})
+            
+            if "Item" not in response:
+                return create_error_response(404, "Not Found", "招待が見つかりません")
+
+            invitation = response["Item"]
+
+            # 有効期限チェック
+            current_time = int(time.time())
+            if invitation.get("expiresAt", 0) < current_time:
+                return create_error_response(410, "Gone", "招待の有効期限が切れています")
+
+            # 使用済みチェック
+            if invitation.get("isUsed", False):
+                return create_error_response(410, "Gone", "この招待は既に使用されています")
+
+            return create_success_response({
+                "invitationId": invitation["invitationId"],
+                "botId": invitation["botId"],
+                "email": invitation["email"],
+                "permission": invitation["permission"],
+                "inviterEmail": invitation.get("inviterEmail", ""),
+                "createdAt": invitation["createdAt"],
+                "expiresAt": invitation["expiresAt"] * 1000
+            })
+
+        except Exception as e:
+            logger.error(f"Error getting invitation: {e}")
+            return create_error_response(500, "Internal Server Error", "招待情報の取得に失敗しました")
+
+    def _handle_accept_invitation(self, invitation_id: str, headers: Dict[str, str]) -> Dict[str, Any]:
+        """招待受諾処理
+
+        Args:
+            invitation_id: 招待ID
+            headers: リクエストヘッダー
+
+        Returns:
+            招待受諾結果のレスポンス
+        """
+        try:
+            # ユーザー認証（オプショナル - 未認証でも受諾可能）
+            current_user = self._authenticate_user(headers)
+
+            # 招待情報を取得
+            response = table.get_item(Key={"PK": f"INVITATION#{invitation_id}", "SK": "INFO"})
+            
+            if "Item" not in response:
+                return create_error_response(404, "Not Found", "招待が見つかりません")
+
+            invitation = response["Item"]
+
+            # 有効期限チェック
+            current_time = int(time.time())
+            if invitation.get("expiresAt", 0) < current_time:
+                return create_error_response(410, "Gone", "招待の有効期限が切れています")
+
+            # 使用済みチェック
+            if invitation.get("isUsed", False):
+                return create_error_response(410, "Gone", "この招待は既に使用されています")
+
+            # 招待されたメールアドレスのユーザーを取得または作成
+            invited_email = invitation["email"]
+            user_response = table.get_item(Key={"PK": f"USER#{invited_email}", "SK": "PROFILE"})
+            
+            if "Item" not in user_response:
+                # ユーザーが存在しない場合、仮ユーザーとして作成
+                user_id = str(uuid.uuid4())
+                current_time_ms = int(time.time() * 1000)
+                
+                user_data = {
+                    "PK": f"USER#{invited_email}",
+                    "SK": "PROFILE",
+                    "userId": user_id,
+                    "email": invited_email,
+                    "name": invited_email.split("@")[0],  # メールアドレスから名前を生成
+                    "passwordHash": "",  # パスワード未設定
+                    "role": "user",
+                    "createdAt": current_time_ms,
+                    "updatedAt": current_time_ms,
+                    "isActive": True,
+                    "isInvited": True  # 招待経由で作成されたユーザー
+                }
+                
+                table.put_item(Item=user_data)
+                user = user_data
+            else:
+                user = user_response["Item"]
+
+            # ボットアクセス権限を付与
+            access_data = {
+                "PK": f"BOT#{invitation['botId']}",
+                "SK": f"ACCESS#{user['userId']}",
+                "accessId": str(uuid.uuid4()),
+                "botId": invitation["botId"],
+                "userId": user["userId"],
+                "permission": invitation["permission"],
+                "createdAt": int(time.time() * 1000),
+                "updatedAt": int(time.time() * 1000),
+                "invitedBy": invitation.get("inviterId", "")
+            }
+
+            table.put_item(Item=access_data)
+
+            # 招待を使用済みにマーク
+            table.update_item(
+                Key={"PK": f"INVITATION#{invitation_id}", "SK": "INFO"},
+                UpdateExpression="SET isUsed = :used, usedAt = :used_at, usedBy = :used_by",
+                ExpressionAttributeValues={
+                    ":used": True,
+                    ":used_at": int(time.time() * 1000),
+                    ":used_by": user["userId"]
+                }
+            )
+
+            logger.info(f"Invitation accepted: {invitation_id} by {invited_email}")
+
+            return create_success_response({
+                "message": "招待が正常に受諾されました。ボットにアクセスできるようになりました。",
+                "botId": invitation["botId"],
+                "permission": invitation["permission"],
+                "user": {
+                    "userId": user["userId"],
+                    "email": user["email"],
+                    "name": user["name"]
+                }
+            })
+
+        except Exception as e:
+            logger.error(f"Error accepting invitation: {e}")
+            return create_error_response(500, "Internal Server Error", "招待の受諾に失敗しました")
+
+    def _handle_update_user_permission(self, bot_id: str, user_id: str, body: Union[str, Dict], headers: Dict[str, str]) -> Dict[str, Any]:
+        """ユーザー権限変更
+
+        Args:
+            bot_id: ボットID
+            user_id: ユーザーID
+            body: リクエストボディ
+            headers: リクエストヘッダー
+
+        Returns:
+            権限変更結果のレスポンス
+        """
+        try:
+            # 認証チェック
+            current_user = self._authenticate_user(headers)
+            if not current_user:
+                return create_error_response(401, "Unauthorized", "認証が必要です")
+
+            # リクエストボディをパース
+            if isinstance(body, str):
+                data = json.loads(body)
+            else:
+                data = body
+
+            new_permission = data.get("permission")
+
+            # バリデーション
+            if new_permission not in ["read", "write", "admin"]:
+                return create_error_response(400, "Bad Request", "無効な権限レベルです")
+
+            # 対象ユーザーのアクセス権限を更新
+            table.update_item(
+                Key={"PK": f"BOT#{bot_id}", "SK": f"ACCESS#{user_id}"},
+                UpdateExpression="SET permission = :permission, updatedAt = :updated_at",
+                ExpressionAttributeValues={
+                    ":permission": new_permission,
+                    ":updated_at": int(time.time() * 1000)
+                }
+            )
+
+            logger.info(f"User permission updated: {user_id} -> {new_permission} for bot {bot_id}")
+
+            return create_success_response({
+                "message": "ユーザー権限が更新されました",
+                "userId": user_id,
+                "botId": bot_id,
+                "permission": new_permission
+            })
+
+        except json.JSONDecodeError:
+            return create_error_response(400, "Bad Request", "Invalid JSON format")
+        except Exception as e:
+            logger.error(f"Error updating user permission: {e}")
+            return create_error_response(500, "Internal Server Error", "権限変更に失敗しました")
+
+    def _handle_remove_user_from_bot(self, bot_id: str, user_id: str, headers: Dict[str, str]) -> Dict[str, Any]:
+        """ボットからユーザーを削除
+
+        Args:
+            bot_id: ボットID
+            user_id: ユーザーID
+            headers: リクエストヘッダー
+
+        Returns:
+            削除結果のレスポンス
+        """
+        try:
+            # 認証チェック
+            current_user = self._authenticate_user(headers)
+            if not current_user:
+                return create_error_response(401, "Unauthorized", "認証が必要です")
+
+            # アクセス権限を削除
+            table.delete_item(Key={"PK": f"BOT#{bot_id}", "SK": f"ACCESS#{user_id}"})
+
+            logger.info(f"User removed from bot: {user_id} from bot {bot_id}")
+
+            return create_success_response({
+                "message": "ユーザーがボットから削除されました",
+                "userId": user_id,
+                "botId": bot_id
+            })
+
+        except Exception as e:
+            logger.error(f"Error removing user from bot: {e}")
+            return create_error_response(500, "Internal Server Error", "ユーザー削除に失敗しました")
