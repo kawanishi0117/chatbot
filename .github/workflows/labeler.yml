@@ -17,6 +17,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v4
+        
       - name: "Apply Labels"
         uses: actions/labeler@v5
         with:
