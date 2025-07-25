@@ -1,0 +1,24 @@
+backend:
+  - backend/**
+
+frontend:
+  - frontend/**
+
+frontend-ui:
+  - frontend/chatbot-ui/**
+
+frontend-console:
+  - frontend/chatbot-console/**
+
+infra:
+  - .github/**
+  - template.yaml
+  - samconfig.toml
+
+docs:
+  - '**/*.md'
+  - document/**
+
+dependencies:
+  - '**/package.json'
+  - '**/requirements.txt'

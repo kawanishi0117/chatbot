@@ -1,10 +1,30 @@
-name-template: "v$NEXT_PATCH_VERSION"
-tag-template: "v$NEXT_PATCH_VERSION"
+name-template: "v${{ nextTag }}"
+tag-template: "v${{ nextTag }}"
+
 categories:
-  - title: "✨ Features"
-    labels: ["feature"]
-  - title: "🐛 Fixes"
-    labels: ["bug"]
-  - title: "📝 Docs"
-    labels: ["docs"]
-change-template: "- $TITLE (#$NUMBER)"
+  - title: 🚀 Features
+    labels:
+      - feat
+  - title: 🐛 Fixes
+    labels:
+      - fix
+  - title: 🧹 Refactoring
+    labels:
+      - refactor
+  - title: 📝 Documentation
+    labels:
+      - docs
+  - title: 🧪 Test
+    labels:
+      - test
+  - title: 🔧 Infrastructure
+    labels:
+      - infra
+  - title: 🧪 CI/CD
+    labels:
+      - ci
+
+change-template: "- ${{ heading }} [#${{ number }}] ${{ title }} by @${{ author }}"
+template: |
+  ## What's Changed
+  $CHANGES
