@@ -146,6 +146,14 @@ function AppContent() {
     }
   };
 
+  // ユーザー情報更新処理
+  const handleUserUpdate = (updatedUser: any) => {
+    setAuthState(prev => ({
+      ...prev,
+      user: updatedUser
+    }));
+  };
+
   const handleSelectChatbot = (chatbot: ChatbotConfig | null) => {
     setSelectedChatbot(chatbot);
     setCurrentView('overview');
@@ -410,6 +418,7 @@ function AppContent() {
         onLogout={handleLogout}
         onToggleSidebar={handleToggleSidebar}
         isSidebarOpen={isSidebarOpen}
+        onUserUpdate={handleUserUpdate}
       />
       
       <div className="flex-1 flex overflow-hidden">

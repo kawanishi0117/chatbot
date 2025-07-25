@@ -88,6 +88,8 @@ class UserHandler:
                 return self._handle_login(body)
             elif http_method == "GET" and path == "/api/auth/me":
                 return self._handle_get_current_user(headers)
+            elif http_method == "PUT" and path == "/api/auth/me":
+                return self._handle_update_profile(body, headers)
             elif http_method == "POST" and path == "/api/auth/logout":
                 return self._handle_logout(headers)
             else:
@@ -386,6 +388,131 @@ class UserHandler:
             return create_error_response(
                 500, "Internal Server Error", "ユーザー情報の取得に失敗しました"
             )
+
+    def _handle_update_profile(self, body: Union[str, Dict], headers: Dict[str, str]) -> Dict[str, Any]:
+        """ユーザープロファイル更新
+
+        Args:
+            body: リクエストボディ
+            headers: リクエストヘッダー
+
+        Returns:
+            更新結果のレスポンス
+        """
+        try:
+            # 認証チェック
+            auth_header = headers.get("Authorization", "") or headers.get("authorization", "")
+            if not auth_header.startswith("Bearer "):
+                return create_error_response(401, "Unauthorized", "認証トークンが必要です")
+
+            token = auth_header.replace("Bearer ", "")
+
+            # セッション情報を取得
+            session_response = table.get_item(Key={"PK": f"SESSION#{token}", "SK": "INFO"})
+            if "Item" not in session_response:
+                return create_error_response(401, "Unauthorized", "無効な認証トークンです")
+
+            session = session_response["Item"]
+
+            # セッションの有効期限チェック
+            current_time = int(time.time())
+            if session.get("expiresAt", 0) < current_time:
+                return create_error_response(401, "Unauthorized", "セッションの有効期限が切れています")
+
+            # 現在のユーザー情報を取得
+            current_email = session["email"]
+            user_response = table.get_item(Key={"PK": f"USER#{current_email}", "SK": "PROFILE"})
+            if "Item" not in user_response:
+                return create_error_response(404, "Not Found", "ユーザー情報が見つかりません")
+
+            current_user = user_response["Item"]
+
+            # リクエストボディをパース
+            if isinstance(body, str):
+                data = json.loads(body)
+            else:
+                data = body
+
+            # 更新可能なフィールドを取得
+            new_email = data.get("email", "").lower() if data.get("email") else current_email
+            new_name = data.get("name", current_user["name"])
+            new_password = data.get("password")
+
+            # バリデーション
+            if new_email != current_email:
+                # メールアドレスの形式チェック
+                if "@" not in new_email or len(new_email) < 5:
+                    return create_error_response(400, "Bad Request", "有効なメールアドレスを入力してください")
+                
+                # 新しいメールアドレスが既に使用されていないかチェック
+                existing_user = table.get_item(Key={"PK": f"USER#{new_email}", "SK": "PROFILE"})
+                if "Item" in existing_user:
+                    return create_error_response(409, "Conflict", "このメールアドレスは既に登録されています")
+
+            # 名前のバリデーション
+            if not new_name or len(new_name.strip()) == 0:
+                return create_error_response(400, "Bad Request", "名前は必須です")
+
+            # パスワードのバリデーション（変更する場合のみ）
+            if new_password and len(new_password) < 6:
+                return create_error_response(400, "Bad Request", "パスワードは6文字以上で入力してください")
+
+            # 更新データを準備
+            current_time_ms = int(time.time() * 1000)
+            updated_user_data = {
+                "PK": f"USER#{new_email}",
+                "SK": "PROFILE",
+                "userId": current_user["userId"],  # userIdは変更不可
+                "email": new_email,
+                "name": new_name.strip(),
+                "passwordHash": self._hash_password(new_password) if new_password else current_user["passwordHash"],
+                "role": current_user.get("role", "user"),
+                "createdAt": current_user["createdAt"],
+                "updatedAt": current_time_ms,
+                "isActive": current_user.get("isActive", True),
+            }
+
+            # メールアドレスが変更された場合の処理
+            if new_email != current_email:
+                # 古いユーザーレコードを削除
+                table.delete_item(Key={"PK": f"USER#{current_email}", "SK": "PROFILE"})
+                
+                # セッション情報も更新
+                session_update_data = {
+                    "PK": f"SESSION#{token}",
+                    "SK": "INFO",
+                    "userId": current_user["userId"],
+                    "email": new_email,
+                    "createdAt": session["createdAt"],
+                    "expiresAt": session["expiresAt"],
+                    "ttl": session["ttl"],
+                }
+                table.put_item(Item=session_update_data)
+
+            # 新しいユーザーデータを保存
+            table.put_item(Item=updated_user_data)
+
+            logger.info(f"User profile updated successfully: {current_email} -> {new_email}")
+
+            # レスポンスデータ（パスワードハッシュを除く）
+            response_data = {}
+            for k, v in updated_user_data.items():
+                if k != "passwordHash":
+                    if k in ["createdAt", "updatedAt"] and v is not None:
+                        response_data[k] = int(v)
+                    else:
+                        response_data[k] = v
+
+            return create_success_response(response_data)
+
+        except json.JSONDecodeError:
+            return create_error_response(400, "Bad Request", "Invalid JSON format")
+        except ClientError as e:
+            logger.error(f"DynamoDB error in update profile: {e}")
+            return create_error_response(500, "Internal Server Error", "プロファイル更新に失敗しました")
+        except Exception as e:
+            logger.error(f"Unexpected error in update profile: {e}")
+            return create_error_response(500, "Internal Server Error", "予期しないエラーが発生しました")
 
     def _handle_logout(self, headers: Dict[str, str]) -> Dict[str, Any]:
         """ログアウト処理
