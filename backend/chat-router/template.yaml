@@ -75,9 +75,9 @@ Resources:
           Type: Api
           Properties:
             Path: /api/auth/me
-            Method: GET
+            Method: ANY
         AuthLogoutAPI:
           Type: Api
           Properties:
             Path: /api/auth/logout
-            Method: POST 
+            Method: POST

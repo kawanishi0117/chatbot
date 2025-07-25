@@ -24,7 +24,7 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
 
   return (
     <div 
-      className={`fixed inset-0 z-50 flex items-center justify-center ${backdropClasses[backdrop]}`}
+      className={`fixed inset-0 z-[60] flex items-center justify-center ${backdropClasses[backdrop]}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="loading-message"

@@ -121,7 +121,7 @@ class ApiClient {
       role: string;
       createdAt: number;
       updatedAt: number;
-    }>('/api/auth/profile', {
+    }>('/api/auth/me', {
       method: 'PUT',
       body: JSON.stringify(data),
     });

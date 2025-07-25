@@ -74,7 +74,7 @@ class UserHandler:
                 return self._handle_login(body)
             elif http_method == "GET" and path == "/api/auth/me":
                 return self._handle_get_current_user(headers)
-            elif http_method == "PUT" and path == "/api/auth/profile":
+            elif http_method == "PUT" and path == "/api/auth/me":
                 return self._handle_update_profile(body, headers)
             elif http_method == "POST" and path == "/api/auth/logout":
                 return self._handle_logout(headers)

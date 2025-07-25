@@ -1,6 +1,7 @@
-import { Bell, LogOut, Menu, Settings, User, Edit } from 'lucide-react';
-import React, { useState } from 'react';
+import { Bell, ChevronDown, Key, LogOut, Menu, Settings, User } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 import { User as UserType } from '../types';
+import PasswordEdit from './PasswordEdit';
 import ProfileEdit from './ProfileEdit';
 
 interface HeaderProps {
@@ -19,12 +20,34 @@ const Header: React.FC<HeaderProps> = ({
   onUserUpdate
 }) => {
   const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [showPasswordEdit, setShowPasswordEdit] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const handleUserUpdate = (updatedUser: UserType) => {
     if (onUserUpdate) {
       onUserUpdate(updatedUser);
     }
   };
+
+  const handlePasswordSuccess = () => {
+    // パスワード変更成功時の処理（必要に応じて）
+    console.log('パスワードが正常に変更されました');
+  };
+
+  // メニュー外クリックで閉じる
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
     <>
@@ -71,15 +94,42 @@ const Header: React.FC<HeaderProps> = ({
                 <User className="w-4 h-4 text-white" />
               </div>
 
-              {/* プロファイル編集ボタン */}
+              {/* ユーザーメニュードロップダウン */}
               {user && (
-                <button
-                  onClick={() => setShowProfileEdit(true)}
-                  className="p-2 rounded-lg text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                  title="プロファイル編集"
-                >
-                  <Edit className="w-5 h-5" />
-                </button>
+                <div className="relative" ref={userMenuRef}>
+                  <button
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="flex items-center space-x-1 p-2 rounded-lg text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                  >
+                    <User className="w-5 h-5" />
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                  
+                  {showUserMenu && (
+                    <div className="absolute right-0 mt-2 w-48 py-1 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+                      <button
+                        onClick={() => {
+                          setShowProfileEdit(true);
+                          setShowUserMenu(false);
+                        }}
+                        className="flex items-center space-x-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        <User className="w-4 h-4" />
+                        <span>プロファイル編集</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowPasswordEdit(true);
+                          setShowUserMenu(false);
+                        }}
+                        className="flex items-center space-x-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        <Key className="w-4 h-4" />
+                        <span>パスワード変更</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
 
               <button
@@ -100,6 +150,14 @@ const Header: React.FC<HeaderProps> = ({
           user={user}
           onClose={() => setShowProfileEdit(false)}
           onUpdate={handleUserUpdate}
+        />
+      )}
+
+      {/* パスワード変更モーダル */}
+      {showPasswordEdit && (
+        <PasswordEdit
+          onClose={() => setShowPasswordEdit(false)}
+          onSuccess={handlePasswordSuccess}
         />
       )}
     </>
