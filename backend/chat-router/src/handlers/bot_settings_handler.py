@@ -9,6 +9,7 @@ import os
 import uuid
 import time
 import json
+from decimal import Decimal
 from typing import Any, Dict, List, Optional, Union
 
 import boto3
@@ -44,6 +45,19 @@ class BotSettingsHandler:
     def __init__(self):
         """ボット設定ハンドラーの初期化"""
         self.validator = BotValidator()
+
+    def _convert_decimal_to_int(self, value: Any) -> Union[int, Any]:
+        """Decimal型の値をintに変換する
+
+        Args:
+            value: 変換対象の値
+
+        Returns:
+            int型に変換された値、またはそのままの値
+        """
+        if isinstance(value, Decimal):
+            return int(value)
+        return value
 
     def handle_request(
         self,
@@ -192,8 +206,8 @@ class BotSettingsHandler:
                     "botName": item["botName"],
                     "description": item.get("description", ""),
                     "creatorId": item["creatorId"],
-                    "createdAt": item["createdAt"],
-                    "updatedAt": item["updatedAt"],
+                    "createdAt": self._convert_decimal_to_int(item["createdAt"]),
+                    "updatedAt": self._convert_decimal_to_int(item["updatedAt"]),
                     "isActive": item.get("isActive", True),
                 }
                 bot_list.append(bot_data)
@@ -245,8 +259,8 @@ class BotSettingsHandler:
                 "botName": item["botName"],
                 "description": item.get("description", ""),
                 "creatorId": item["creatorId"],
-                "createdAt": item["createdAt"],
-                "updatedAt": item["updatedAt"],
+                "createdAt": self._convert_decimal_to_int(item["createdAt"]),
+                "updatedAt": self._convert_decimal_to_int(item["updatedAt"]),
                 "isActive": item.get("isActive", True),
             }
 
@@ -337,8 +351,8 @@ class BotSettingsHandler:
                 "botName": updated_item["botName"],
                 "description": updated_item.get("description", ""),
                 "creatorId": updated_item["creatorId"],
-                "createdAt": updated_item["createdAt"],
-                "updatedAt": updated_item["updatedAt"],
+                "createdAt": self._convert_decimal_to_int(updated_item["createdAt"]),
+                "updatedAt": self._convert_decimal_to_int(updated_item["updatedAt"]),
                 "isActive": updated_item.get("isActive", True),
             }
 

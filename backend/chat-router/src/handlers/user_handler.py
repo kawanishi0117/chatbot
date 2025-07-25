@@ -11,6 +11,7 @@ import time
 import json
 import hashlib
 import secrets
+from decimal import Decimal
 from typing import Any, Dict, List, Optional, Union
 
 import boto3
@@ -45,6 +46,19 @@ class UserHandler:
         """ユーザーハンドラーの初期化"""
         # セッショントークンの有効期限（24時間）
         self.token_expiry_seconds = 86400
+
+    def _convert_decimal_to_int(self, value: Any) -> Union[int, Any]:
+        """Decimal型の値をintに変換する
+
+        Args:
+            value: 変換対象の値
+
+        Returns:
+            int型に変換された値、またはそのままの値
+        """
+        if isinstance(value, Decimal):
+            return int(value)
+        return value
 
     def handle_request(
         self,
@@ -353,8 +367,16 @@ class UserHandler:
                 "email": user["email"],
                 "name": user["name"],
                 "role": user.get("role", "user"),
-                "createdAt": int(user["createdAt"]) if user["createdAt"] else 0,
-                "updatedAt": int(user["updatedAt"]) if user["updatedAt"] else 0,
+                "createdAt": (
+                    self._convert_decimal_to_int(user["createdAt"])
+                    if user["createdAt"]
+                    else 0
+                ),
+                "updatedAt": (
+                    self._convert_decimal_to_int(user["updatedAt"])
+                    if user["updatedAt"]
+                    else 0
+                ),
             }
 
             return create_success_response(response_data)
