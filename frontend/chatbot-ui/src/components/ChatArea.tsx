@@ -19,20 +19,20 @@ const ChatArea: React.FC<ChatAreaProps> = ({ currentChat, onSendMessage, isTypin
   }, [currentChat?.messages, isTyping]);
 
   const EmptyState = () => (
-    <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto scrollbar-thin">
+    <div className="flex-1 flex items-center justify-center p-3 overflow-y-auto scrollbar-thin">
       <div className="text-center max-w-2xl">
         <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
           <Bot className="w-10 h-10 text-white" />
         </div>
-        <h2 className="text-3xl font-bold text-gray-900 mb-3">ChatBot AIへようこそ</h2>
-        <p className="text-lg text-gray-600 mb-8">
+        <h2 className="text-3xl font-bold text-gray-900 mb-2">ChatBot AIへようこそ</h2>
+        <p className="text-lg text-gray-600 mb-6">
           質問や相談をお気軽にどうぞ。AIがお答えします。
         </p>
         
         {/* サンプル質問 */}
-        <div className="space-y-3">
-          <p className="text-sm font-semibold text-gray-700 mb-4">例えば、こんなことを聞いてみてください：</p>
-          <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-gray-700 mb-3">例えば、こんなことを聞いてみてください：</p>
+          <div className="grid gap-2 sm:grid-cols-2">
             {[
               '今日の天気はどうですか？',
               'JavaScriptについて教えて',
@@ -79,17 +79,17 @@ const ChatArea: React.FC<ChatAreaProps> = ({ currentChat, onSendMessage, isTypin
       </div>
 
       {/* メッセージエリア */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin">
-        <div className="w-full max-w-5xl mx-auto">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 scrollbar-thin">
+        <div className="w-full max-w-4xl mx-auto">
           {currentChat.messages.length === 0 ? (
-            <div className="text-center py-6">
+            <div className="text-center py-4">
               <Bot className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">
                 新しいチャットを開始しました。何でもお聞きください！
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {currentChat.messages.map((message) => (
                 <div key={message.id} className="group">
                   <Message message={message} />

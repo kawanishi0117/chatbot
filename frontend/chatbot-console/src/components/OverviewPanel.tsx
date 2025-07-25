@@ -89,9 +89,9 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
 
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="max-w-6xl mx-auto p-4 space-y-4">
         {/* ヘッダー */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-4">
               <div className={`
@@ -142,7 +142,7 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
         </div>
 
         {/* 統計情報 */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
           {stats.map((stat) => {
             const Icon = stat.icon;
             return (
@@ -154,11 +154,11 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
                   onEdit();
                 }}
                 className={`
-                  block bg-white rounded-xl border p-6 transition-all cursor-pointer
+                  block bg-white rounded-xl border p-4 transition-all cursor-pointer
                   ${getStatusColor(stat.status)}
                 `}
               >
-                <div className="flex items-start justify-between mb-4">
+                <div className="flex items-start justify-between mb-3">
                   <div className={`
                     w-12 h-12 rounded-lg flex items-center justify-center
                     ${stat.status === 'success' ? 'bg-green-100' : 
@@ -182,8 +182,8 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
         </div>
 
         {/* 最近のアクティビティ */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center">
               <BarChart3 className="w-5 h-5 mr-2 text-gray-500" />
               最近のアクティビティ
@@ -193,7 +193,7 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
             </button>
           </div>
           
-          <div className="space-y-3">
+          <div className="space-y-2">
             {[
               { time: '2時間前', action: 'GitHub リポジトリが更新されました', type: 'github' },
               { time: '4時間前', action: '新しいユーザーがアクセス権限を取得しました', type: 'user' },
@@ -219,9 +219,9 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
         </div>
 
         {/* クイックアクション */}
-        <div className="bg-blue-50 rounded-xl border border-blue-200 p-6">
-          <h3 className="text-lg font-semibold text-blue-900 mb-3">クイックアクション</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
+          <h3 className="text-lg font-semibold text-blue-900 mb-2">クイックアクション</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <button 
               onClick={onEdit}
               className="inline-flex items-center justify-center gap-2 px-4 py-3 bg-white border border-blue-200 rounded-lg text-blue-700 hover:bg-blue-100 transition-all font-medium"
