@@ -1,24 +1,31 @@
 backend:
-  - backend/**
+  - changed-files:
+    - any-glob-to-any-file: 'backend/**'
 
 frontend:
-  - frontend/**
+  - changed-files:
+    - any-glob-to-any-file: 'frontend/**'
 
 frontend-ui:
-  - frontend/chatbot-ui/**
+  - changed-files:
+    - any-glob-to-any-file: 'frontend/chatbot-ui/**'
 
 frontend-console:
-  - frontend/chatbot-console/**
+  - changed-files:
+    - any-glob-to-any-file: 'frontend/chatbot-console/**'
 
 infra:
-  - .github/**
-  - template.yaml
-  - samconfig.toml
+  - changed-files:
+    - any-glob-to-any-file: '.github/**'
+    - any-glob-to-any-file: 'template.yaml'
+    - any-glob-to-any-file: 'samconfig.toml'
 
 docs:
-  - '**/*.md'
-  - document/**
+  - changed-files:
+    - any-glob-to-any-file: '**/*.md'
+    - any-glob-to-any-file: 'document/**'
 
 dependencies:
-  - '**/package.json'
-  - '**/requirements.txt'
+  - changed-files:
+    - any-glob-to-any-file: '**/package.json'
+    - any-glob-to-any-file: '**/requirements.txt'
