@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import ChatArea from './components/ChatArea';
 import Header from './components/Header';
 import { LoadingOverlay, LoadingSpinner } from './components/loading';
@@ -40,6 +41,9 @@ const generateAIResponse = (userMessage: string): string => {
 };
 
 function AppContent() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
@@ -47,11 +51,19 @@ function AppContent() {
   });
 
   const [chats, setChats] = useState<Chat[]>([]);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isUserInfoLoading, setIsUserInfoLoading] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+
+  // URLから現在のチャットIDを取得
+  const getCurrentChatId = (): string | null => {
+    const path = location.pathname;
+    const match = path.match(/^\/chat\/(.+)$/);
+    return match ? match[1] : null;
+  };
+
+  const currentChatId = getCurrentChatId();
 
   // 認証チェックの重複実行を防ぐためのref
   const authCheckInProgress = useRef(false);
@@ -59,6 +71,19 @@ function AppContent() {
 
   // 現在のチャットを取得
   const currentChat = chats.find(chat => chat.id === currentChatId) || null;
+
+  // ユーザー情報更新処理
+  const handleUserUpdate = (updatedUser: any) => {
+    setAuthState(prev => ({
+      ...prev,
+      user: updatedUser
+    }));
+  };
+
+  // サイドバートグル処理
+  const handleToggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
 
   // 初期化時にトークンをチェック
   useEffect(() => {
@@ -185,7 +210,7 @@ function AppContent() {
         isLoading: false
       });
       setChats([]);
-      setCurrentChatId(null);
+      navigate('/');
     }
   };
 
@@ -200,38 +225,27 @@ function AppContent() {
     };
     
     setChats(prev => [newChat, ...prev]);
-    setCurrentChatId(newChat.id);
+    navigate(`/chat/${newChat.id}`);
     setIsSidebarOpen(false);
   };
 
   // チャット選択
   const handleSelectChat = (chatId: string) => {
-    setCurrentChatId(chatId);
+    navigate(`/chat/${chatId}`);
     setIsSidebarOpen(false);
   };
 
   // チャット削除
-  const handleDeleteChat = (chatId: string) => {
-    setChats(prev => prev.filter(chat => chat.id !== chatId));
-    if (currentChatId === chatId) {
-      setCurrentChatId(null);
+  const handleDeleteChat = (deleteChatId: string) => {
+    setChats(prev => prev.filter(chat => chat.id !== deleteChatId));
+    if (currentChatId === deleteChatId) {
+      navigate('/');
     }
   };
 
   // メッセージ送信
   const handleSendMessage = async (content: string) => {
-    if (!currentChatId) {
-      // 新しいチャットを作成
-      const newChat: Chat = {
-        id: Date.now().toString(),
-        title: content.length > 30 ? content.substring(0, 30) + '...' : content,
-        messages: [],
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      setChats(prev => [newChat, ...prev]);
-      setCurrentChatId(newChat.id);
-    }
+    let targetChatId: string;
 
     // ユーザーメッセージを追加
     const userMessage: Message = {
@@ -241,20 +255,36 @@ function AppContent() {
       timestamp: new Date()
     };
 
-    const targetChatId = currentChatId || Date.now().toString();
-    
-    setChats(prev => prev.map(chat => 
-      chat.id === targetChatId 
-        ? {
-            ...chat,
-            messages: [...chat.messages, userMessage],
-            updatedAt: new Date(),
-            title: chat.messages.length === 0 ? 
-              (content.length > 30 ? content.substring(0, 30) + '...' : content) : 
-              chat.title
-          }
-        : chat
-    ));
+    if (!currentChatId) {
+      // 新しいチャットを作成
+      const newChatId = Date.now().toString();
+      targetChatId = newChatId;
+      
+      const newChat: Chat = {
+        id: newChatId,
+        title: content.length > 30 ? content.substring(0, 30) + '...' : content,
+        messages: [userMessage],
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      setChats(prev => [newChat, ...prev]);
+      navigate(`/chat/${newChatId}`);
+    } else {
+      // 既存のチャットにメッセージを追加
+      targetChatId = currentChatId;
+      setChats(prev => prev.map(chat => 
+        chat.id === targetChatId 
+          ? {
+              ...chat,
+              messages: [...chat.messages, userMessage],
+              updatedAt: new Date(),
+              title: chat.messages.length === 0 ? 
+                (content.length > 30 ? content.substring(0, 30) + '...' : content) : 
+                chat.title
+            }
+          : chat
+      ));
+    }
 
     // タイピングインジケーター表示とオーバーレイローディング開始
     setIsTyping(true);
@@ -267,7 +297,7 @@ function AppContent() {
       // AI応答をチャットに追加
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: response.message || generateAIResponse(content), // APIレスポンスまたはフォールバック
+        content: response.message || generateAIResponse(content),
         role: 'assistant',
         timestamp: new Date()
       };
@@ -283,11 +313,10 @@ function AppContent() {
       ));
     } catch (error) {
       console.error('Failed to send message:', error);
-      
-      // エラー時のフォールバック応答
-      const errorMessage: Message = {
+      // エラー時はデモ応答を使用
+      const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: '申し訳ございません。メッセージの送信に失敗しました。もう一度お試しください。',
+        content: generateAIResponse(content),
         role: 'assistant',
         timestamp: new Date()
       };
@@ -296,7 +325,7 @@ function AppContent() {
         chat.id === targetChatId 
           ? {
               ...chat,
-              messages: [...chat.messages, errorMessage],
+              messages: [...chat.messages, aiMessage],
               updatedAt: new Date()
             }
           : chat
@@ -307,20 +336,35 @@ function AppContent() {
     }
   };
 
-  // ユーザー情報更新処理
-  const handleUserUpdate = (updatedUser: any) => {
-    setAuthState(prev => ({
-      ...prev,
-      user: updatedUser
-    }));
+  // チャット詳細ページ用のコンポーネント
+  const ChatRoute = () => {
+    const { chatId } = useParams<{ chatId: string }>();
+    const chat = chats.find(c => c.id === chatId) || null;
+
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <ChatArea
+          currentChat={chat}
+          onSendMessage={handleSendMessage}
+          isTyping={isTyping}
+        />
+      </div>
+    );
   };
 
-  // サイドバートグル
-  const handleToggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
+  // ホームページ用のコンポーネント
+  const HomeRoute = () => {
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <ChatArea
+          currentChat={null}
+          onSendMessage={handleSendMessage}
+          isTyping={isTyping}
+        />
+      </div>
+    );
   };
 
-  // ローディング中の表示
   if (authState.isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -358,12 +402,13 @@ function AppContent() {
           onClose={() => setIsSidebarOpen(false)}
         />
 
-        {/* チャットエリア */}
-        <ChatArea
-          currentChat={currentChat}
-          onSendMessage={handleSendMessage}
-          isTyping={isTyping}
-        />
+        {/* メインエリア */}
+        <main className="flex-1 flex flex-col overflow-hidden">
+          <Routes>
+            <Route path="/" element={<HomeRoute />} />
+            <Route path="/chat/:chatId" element={<ChatRoute />} />
+          </Routes>
+        </main>
       </div>
 
       {/* Loading Overlays */}

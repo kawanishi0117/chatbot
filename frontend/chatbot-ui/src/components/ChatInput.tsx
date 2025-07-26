@@ -42,7 +42,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       // ファイルアップロード処理（今回は実装しない）
-      console.log('File selected:', file);
+      // ファイルが選択されました
     }
   };
 
