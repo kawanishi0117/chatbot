@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BrowserRouter as Router, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import ChatArea from './components/ChatArea';
 import Header from './components/Header';
 import InvitationAccept from './components/InvitationAccept';
@@ -338,8 +338,7 @@ function MainApp() {
 
   // チャット詳細ページ用のコンポーネント
   const ChatRoute = () => {
-    const { chatId } = useParams<{ chatId: string }>();
-    const chat = chats.find(c => c.id === chatId) || null;
+    const chat = currentChat;
 
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -404,10 +403,7 @@ function MainApp() {
 
         {/* メインエリア */}
         <main className="flex-1 flex flex-col overflow-hidden">
-          <Routes>
-            <Route path="/" element={<HomeRoute />} />
-            <Route path="/chat/:chatId" element={<ChatRoute />} />
-          </Routes>
+          {location.pathname === '/' ? <HomeRoute /> : <ChatRoute />}
         </main>
       </div>
 
@@ -431,12 +427,11 @@ function MainApp() {
 function App() {
   return (
     <AlertProvider>
-      <Router>
-        <Routes>
-          <Route path="/invite/:invitationId" element={<InvitationAccept />} />
-          <Route path="/*" element={<MainApp />} />
-        </Routes>
-      </Router>
+      <Routes>
+        <Route path="/invite/:invitationId" element={<InvitationAccept />} />
+        <Route path="/" element={<MainApp />} />
+        <Route path="/chat/:chatId" element={<MainApp />} />
+      </Routes>
     </AlertProvider>
   );
 }
