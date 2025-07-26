@@ -1,7 +1,7 @@
 import { CheckCircle, Mail, Shield, Users } from 'lucide-react';
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { AlertContext } from '../contexts/AlertContext';
+import { useAlert } from '../contexts/AlertContext';
 import { api } from '../services/api';
 import { LoadingOverlay } from './loading';
 
@@ -23,7 +23,7 @@ const InvitationAccept: React.FC = () => {
   const [isAccepted, setIsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { showAlert } = useContext(AlertContext);
+  const { showAlert } = useAlert();
 
   useEffect(() => {
     const loadInvitation = async () => {

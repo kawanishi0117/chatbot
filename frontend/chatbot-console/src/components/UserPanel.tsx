@@ -1,17 +1,17 @@
 import {
-    Calendar,
-    Copy,
-    Edit,
-    Eye,
-    Filter,
-    Plus,
-    Search,
-    Shield,
-    Trash2,
-    Users
+	Calendar,
+	Copy,
+	Edit,
+	Eye,
+	Filter,
+	Plus,
+	Search,
+	Shield,
+	Trash2,
+	Users
 } from 'lucide-react';
-import React, { useContext, useEffect, useState } from 'react';
-import { AlertContext } from '../contexts/AlertContext';
+import React, { useEffect, useState } from 'react';
+import { useAlert } from '../contexts/AlertContext';
 import { api } from '../services/api';
 import { ChatbotConfig, UserAccess } from '../types';
 import { LoadingOverlay } from './loading';
@@ -48,7 +48,7 @@ const UserPanel: React.FC<UserPanelProps> = ({ chatbot, onSave }) => {
   const [invitationUrl, setInvitationUrl] = useState<string>('');
   const [showInvitationUrl, setShowInvitationUrl] = useState(false);
 
-  const { showAlert } = useContext(AlertContext);
+  const { showAlert } = useAlert();
 
   // ユーザー一覧を取得
   const loadUsers = async () => {
@@ -226,7 +226,7 @@ const UserPanel: React.FC<UserPanelProps> = ({ chatbot, onSave }) => {
 
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
-      {isLoading && <LoadingOverlay />}
+      <LoadingOverlay isVisible={isLoading} />
       
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* ヘッダー */}
