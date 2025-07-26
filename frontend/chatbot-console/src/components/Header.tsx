@@ -32,7 +32,7 @@ const Header: React.FC<HeaderProps> = ({
 
   const handlePasswordSuccess = () => {
     // パスワード変更成功時の処理（必要に応じて）
-    console.log('パスワードが正常に変更されました');
+            // パスワード変更完了
   };
 
   // メニュー外クリックで閉じる
@@ -58,6 +58,7 @@ const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onToggleSidebar}
               className="p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors lg:hidden"
+              aria-label="Toggle sidebar"
             >
               <Menu className="w-5 h-5" />
             </button>

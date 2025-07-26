@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { BrowserRouter as Router, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import ChatArea from './components/ChatArea';
 import Header from './components/Header';
 import InvitationAccept from './components/InvitationAccept';
@@ -42,6 +42,8 @@ const generateAIResponse = (userMessage: string): string => {
 };
 
 function MainApp() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
@@ -49,32 +51,83 @@ function MainApp() {
   });
 
   const [chats, setChats] = useState<Chat[]>([]);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isUserInfoLoading, setIsUserInfoLoading] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
 
+  // URLから現在のチャットIDを取得
+  const getCurrentChatId = (): string | null => {
+    const path = location.pathname;
+    const match = path.match(/^\/chat\/(.+)$/);
+    return match ? match[1] : null;
+  };
+
+  const currentChatId = getCurrentChatId();
+
+  // 認証チェックの重複実行を防ぐためのref
+  const authCheckInProgress = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   // 現在のチャットを取得
   const currentChat = chats.find(chat => chat.id === currentChatId) || null;
 
+  // ユーザー情報更新処理
+  const handleUserUpdate = (updatedUser: any) => {
+    setAuthState(prev => ({
+      ...prev,
+      user: updatedUser
+    }));
+  };
+
+  // サイドバートグル処理
+  const handleToggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
   // 初期化時にトークンをチェック
   useEffect(() => {
+    let isMounted = true; // マウント状態の追跡
+    
     const checkAuth = async () => {
+      // 既に認証チェックが進行中の場合は何もしない
+      if (authCheckInProgress.current) {
+        return;
+      }
+
+      authCheckInProgress.current = true;
+      
+      // 前回のリクエストがあればキャンセル
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // 新しいAbortControllerを作成
+      abortControllerRef.current = new AbortController();
+
       const token = getToken();
       if (token) {
         try {
           const user = await api.getCurrentUser();
-          setAuthState({
-            user: {
-              id: user.userId,
-              email: user.email,
-              name: user.name
-            },
-            isAuthenticated: true,
-            isLoading: false
-          });
+          
+          // コンポーネントがマウントされており、リクエストがキャンセルされていないかチェック
+          if (isMounted && !abortControllerRef.current?.signal.aborted) {
+            setAuthState({
+              user: {
+                id: user.userId,
+                email: user.email,
+                name: user.name
+              },
+              isAuthenticated: true,
+              isLoading: false
+            });
+          }
         } catch (error) {
+          // リクエストがキャンセルされた場合は何もしない
+          if (abortControllerRef.current?.signal.aborted || !isMounted) {
+            return;
+          }
+          
           // トークンが無効な場合
           api.logout();
           setAuthState({
@@ -84,35 +137,61 @@ function MainApp() {
           });
         }
       } else {
-        setAuthState({
-          user: null,
-          isAuthenticated: false,
-          isLoading: false
-        });
+        if (isMounted) {
+          setAuthState({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false
+          });
+        }
       }
+      
+      authCheckInProgress.current = false;
     };
     
     checkAuth();
+
+    // クリーンアップ関数
+    return () => {
+      isMounted = false; // アンマウント時にフラグを無効化
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      authCheckInProgress.current = false;
+    };
   }, []);
 
   // ログイン処理
   const handleLogin = async (_email: string, _password: string) => {
     // Login コンポーネント内で既にAPIを呼び出しているので、
-    // ここではユーザー情報を再取得
+    // ここではユーザー情報を再取得せずに、ログイン成功を処理
     setIsUserInfoLoading(true);
     try {
-      const user = await api.getCurrentUser();
-      setAuthState({
-        user: {
-          id: user.userId,
-          email: user.email,
-          name: user.name
-        },
-        isAuthenticated: true,
-        isLoading: false
-      });
+      // ログイン後は認証チェックの重複を防ぐためにフラグをリセット
+      authCheckInProgress.current = false;
+      
+      // トークンが既に設定されているはずなので、ユーザー情報を取得
+      // ただし、重複チェックを避けるため、既に進行中でないことを確認
+      if (!authCheckInProgress.current) {
+        const user = await api.getCurrentUser();
+        setAuthState({
+          user: {
+            id: user.userId,
+            email: user.email,
+            name: user.name
+          },
+          isAuthenticated: true,
+          isLoading: false
+        });
+      }
     } catch (error) {
       console.error('Failed to get user info:', error);
+      // エラーの場合は認証状態をリセット
+      setAuthState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false
+      });
     } finally {
       setIsUserInfoLoading(false);
     }
@@ -131,7 +210,7 @@ function MainApp() {
         isLoading: false
       });
       setChats([]);
-      setCurrentChatId(null);
+      navigate('/');
     }
   };
 
@@ -146,38 +225,27 @@ function MainApp() {
     };
     
     setChats(prev => [newChat, ...prev]);
-    setCurrentChatId(newChat.id);
+    navigate(`/chat/${newChat.id}`);
     setIsSidebarOpen(false);
   };
 
   // チャット選択
   const handleSelectChat = (chatId: string) => {
-    setCurrentChatId(chatId);
+    navigate(`/chat/${chatId}`);
     setIsSidebarOpen(false);
   };
 
   // チャット削除
-  const handleDeleteChat = (chatId: string) => {
-    setChats(prev => prev.filter(chat => chat.id !== chatId));
-    if (currentChatId === chatId) {
-      setCurrentChatId(null);
+  const handleDeleteChat = (deleteChatId: string) => {
+    setChats(prev => prev.filter(chat => chat.id !== deleteChatId));
+    if (currentChatId === deleteChatId) {
+      navigate('/');
     }
   };
 
   // メッセージ送信
   const handleSendMessage = async (content: string) => {
-    if (!currentChatId) {
-      // 新しいチャットを作成
-      const newChat: Chat = {
-        id: Date.now().toString(),
-        title: content.length > 30 ? content.substring(0, 30) + '...' : content,
-        messages: [],
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      setChats(prev => [newChat, ...prev]);
-      setCurrentChatId(newChat.id);
-    }
+    let targetChatId: string;
 
     // ユーザーメッセージを追加
     const userMessage: Message = {
@@ -187,20 +255,36 @@ function MainApp() {
       timestamp: new Date()
     };
 
-    const targetChatId = currentChatId || Date.now().toString();
-    
-    setChats(prev => prev.map(chat => 
-      chat.id === targetChatId 
-        ? {
-            ...chat,
-            messages: [...chat.messages, userMessage],
-            updatedAt: new Date(),
-            title: chat.messages.length === 0 ? 
-              (content.length > 30 ? content.substring(0, 30) + '...' : content) : 
-              chat.title
-          }
-        : chat
-    ));
+    if (!currentChatId) {
+      // 新しいチャットを作成
+      const newChatId = Date.now().toString();
+      targetChatId = newChatId;
+      
+      const newChat: Chat = {
+        id: newChatId,
+        title: content.length > 30 ? content.substring(0, 30) + '...' : content,
+        messages: [userMessage],
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      setChats(prev => [newChat, ...prev]);
+      navigate(`/chat/${newChatId}`);
+    } else {
+      // 既存のチャットにメッセージを追加
+      targetChatId = currentChatId;
+      setChats(prev => prev.map(chat => 
+        chat.id === targetChatId 
+          ? {
+              ...chat,
+              messages: [...chat.messages, userMessage],
+              updatedAt: new Date(),
+              title: chat.messages.length === 0 ? 
+                (content.length > 30 ? content.substring(0, 30) + '...' : content) : 
+                chat.title
+            }
+          : chat
+      ));
+    }
 
     // タイピングインジケーター表示とオーバーレイローディング開始
     setIsTyping(true);
@@ -213,7 +297,7 @@ function MainApp() {
       // AI応答をチャットに追加
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: response.message || generateAIResponse(content), // APIレスポンスまたはフォールバック
+        content: response.message || generateAIResponse(content),
         role: 'assistant',
         timestamp: new Date()
       };
@@ -229,11 +313,10 @@ function MainApp() {
       ));
     } catch (error) {
       console.error('Failed to send message:', error);
-      
-      // エラー時のフォールバック応答
-      const errorMessage: Message = {
+      // エラー時はデモ応答を使用
+      const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: '申し訳ございません。メッセージの送信に失敗しました。もう一度お試しください。',
+        content: generateAIResponse(content),
         role: 'assistant',
         timestamp: new Date()
       };
@@ -242,7 +325,7 @@ function MainApp() {
         chat.id === targetChatId 
           ? {
               ...chat,
-              messages: [...chat.messages, errorMessage],
+              messages: [...chat.messages, aiMessage],
               updatedAt: new Date()
             }
           : chat
@@ -253,20 +336,35 @@ function MainApp() {
     }
   };
 
-  // ユーザー情報更新処理
-  const handleUserUpdate = (updatedUser: any) => {
-    setAuthState(prev => ({
-      ...prev,
-      user: updatedUser
-    }));
+  // チャット詳細ページ用のコンポーネント
+  const ChatRoute = () => {
+    const { chatId } = useParams<{ chatId: string }>();
+    const chat = chats.find(c => c.id === chatId) || null;
+
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <ChatArea
+          currentChat={chat}
+          onSendMessage={handleSendMessage}
+          isTyping={isTyping}
+        />
+      </div>
+    );
   };
 
-  // サイドバートグル
-  const handleToggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
+  // ホームページ用のコンポーネント
+  const HomeRoute = () => {
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <ChatArea
+          currentChat={null}
+          onSendMessage={handleSendMessage}
+          isTyping={isTyping}
+        />
+      </div>
+    );
   };
 
-  // ローディング中の表示
   if (authState.isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -304,12 +402,13 @@ function MainApp() {
           onClose={() => setIsSidebarOpen(false)}
         />
 
-        {/* チャットエリア */}
-        <ChatArea
-          currentChat={currentChat}
-          onSendMessage={handleSendMessage}
-          isTyping={isTyping}
-        />
+        {/* メインエリア */}
+        <main className="flex-1 flex flex-col overflow-hidden">
+          <Routes>
+            <Route path="/" element={<HomeRoute />} />
+            <Route path="/chat/:chatId" element={<ChatRoute />} />
+          </Routes>
+        </main>
       </div>
 
       {/* Loading Overlays */}

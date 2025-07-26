@@ -143,7 +143,7 @@ const UserPanel: React.FC<UserPanelProps> = ({ chatbot, onSave }) => {
   };
 
   const handleViewUser = (user: BotUser['user']) => {
-    // デモ用のユーザー詳細表示
+    // ユーザー詳細表示
     showAlert(`ユーザー詳細: ${user.name} (${user.email})`, 'info');
   };
 
