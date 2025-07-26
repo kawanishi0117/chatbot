@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import BotList from './components/BotList'; // Added BotList import
 import GitHubPanel from './components/GitHubPanel';
 import Header from './components/Header';
@@ -32,26 +32,56 @@ function AppContent() {
   const [isLoadingBots, setIsLoadingBots] = useState(false);
   const [isDeletingBot, setIsDeletingBot] = useState(false);
 
+  // 認証チェックの重複実行を防ぐためのref
+  const authCheckInProgress = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   // 初期化時にトークンをチェック
   useEffect(() => {
+    let isMounted = true; // マウント状態の追跡
+    
     const checkAuth = async () => {
+      // 既に認証チェックが進行中の場合は何もしない
+      if (authCheckInProgress.current) {
+        return;
+      }
+
+      authCheckInProgress.current = true;
+      
+      // 前回のリクエストがあればキャンセル
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // 新しいAbortControllerを作成
+      abortControllerRef.current = new AbortController();
+
       const token = getToken();
       if (token) {
         try {
           const user = await api.getCurrentUser();
-          setAuthState({
-            user: {
-              id: user.userId,
-              email: user.email,
-              name: user.name,
-              role: user.role as 'user' | 'admin',
-              createdAt: new Date(user.createdAt).toISOString(),
-              updatedAt: new Date(user.updatedAt).toISOString()
-            },
-            isAuthenticated: true,
-            isLoading: false
-          });
+          
+          // コンポーネントがマウントされており、リクエストがキャンセルされていないかチェック
+          if (isMounted && !abortControllerRef.current?.signal.aborted) {
+            setAuthState({
+              user: {
+                id: user.userId,
+                email: user.email,
+                name: user.name,
+                role: user.role as 'user' | 'admin',
+                createdAt: new Date(user.createdAt).toISOString(),
+                updatedAt: new Date(user.updatedAt).toISOString()
+              },
+              isAuthenticated: true,
+              isLoading: false
+            });
+          }
         } catch (error) {
+          // リクエストがキャンセルされた場合は何もしない
+          if (abortControllerRef.current?.signal.aborted || !isMounted) {
+            return;
+          }
+          
           // トークンが無効な場合
           api.logout();
           setAuthState({
@@ -61,69 +91,113 @@ function AppContent() {
           });
         }
       } else {
-        setAuthState({
-          user: null,
-          isAuthenticated: false,
-          isLoading: false
-        });
+        if (isMounted) {
+          setAuthState({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false
+          });
+        }
       }
+      
+      authCheckInProgress.current = false;
     };
     
     checkAuth();
+
+    // クリーンアップ関数
+    return () => {
+      isMounted = false; // アンマウント時にフラグを無効化
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      authCheckInProgress.current = false;
+    };
   }, []);
 
   // チャットボットデータを取得
   useEffect(() => {
+    let isMounted = true; // マウント状態の追跡
+    let requestInProgress = false; // リクエスト進行状態の追跡
+    
     const fetchBots = async () => {
-      if (authState.isAuthenticated && authState.user) {
+      if (authState.isAuthenticated && authState.user && !requestInProgress) {
+        requestInProgress = true;
         setIsLoadingBots(true);
         try {
           const response = await api.getBots();
-          const botList = response.bots.map(bot => ({
-            id: bot.botId,
-            name: bot.botName,
-            description: bot.description,
-            githubRepo: '',  // これらは別途管理
-            s3Folder: '',
-            isActive: bot.isActive,
-            createdAt: new Date(bot.createdAt).toISOString(),
-            updatedAt: new Date(bot.updatedAt).toISOString()
-          }));
-          setChatbots(botList);
-          if (botList.length > 0) {
-            setSelectedChatbot(botList[0]);
+          
+          // コンポーネントがマウントされているかチェック
+          if (isMounted) {
+            const botList = response.bots.map(bot => ({
+              id: bot.botId,
+              name: bot.botName,
+              description: bot.description,
+              githubRepo: '',  // これらは別途管理
+              s3Folder: '',
+              isActive: bot.isActive,
+              createdAt: new Date(bot.createdAt).toISOString(),
+              updatedAt: new Date(bot.updatedAt).toISOString()
+            }));
+            setChatbots(botList);
+            if (botList.length > 0) {
+              setSelectedChatbot(botList[0]);
+            }
           }
         } catch (error) {
-          console.error('Failed to fetch bots:', error);
+          if (isMounted) {
+            console.error('Failed to fetch bots:', error);
+          }
         } finally {
-          setIsLoadingBots(false);
+          if (isMounted) {
+            setIsLoadingBots(false);
+          }
+          requestInProgress = false;
         }
       }
     };
     
     fetchBots();
+    
+    // クリーンアップ関数
+    return () => {
+      isMounted = false;
+    };
   }, [authState.isAuthenticated, authState.user]);
 
   const handleLogin = async (_email: string, _password: string) => {
     // Login コンポーネント内で既にAPIを呼び出しているので、
-    // ここではユーザー情報を再取得
+    // ここではユーザー情報を再取得せずに、ログイン成功を処理
     setIsUserInfoLoading(true);
     try {
-      const user = await api.getCurrentUser();
-      setAuthState({
-        user: {
-          id: user.userId,
-          email: user.email,
-          name: user.name,
-          role: user.role as 'user' | 'admin',
-          createdAt: new Date(user.createdAt).toISOString(),
-          updatedAt: new Date(user.updatedAt).toISOString()
-        },
-        isAuthenticated: true,
-        isLoading: false
-      });
+      // ログイン後は認証チェックの重複を防ぐためにフラグをリセット
+      authCheckInProgress.current = false;
+      
+      // トークンが既に設定されているはずなので、ユーザー情報を取得
+      // ただし、重複チェックを避けるため、既に進行中でないことを確認
+      if (!authCheckInProgress.current) {
+        const user = await api.getCurrentUser();
+        setAuthState({
+          user: {
+            id: user.userId,
+            email: user.email,
+            name: user.name,
+            role: user.role as 'user' | 'admin',
+            createdAt: new Date(user.createdAt).toISOString(),
+            updatedAt: new Date(user.updatedAt).toISOString()
+          },
+          isAuthenticated: true,
+          isLoading: false
+        });
+      }
     } catch (error) {
       console.error('Failed to get user info:', error);
+      // エラーの場合は認証状態をリセット
+      setAuthState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false
+      });
     } finally {
       setIsUserInfoLoading(false);
     }

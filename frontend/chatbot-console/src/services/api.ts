@@ -25,15 +25,40 @@ export const removeToken = (): void => {
 // HTTPクライアント
 class ApiClient {
   private baseURL: string;
+  private requestCache: Map<string, Promise<any>> = new Map(); // リクエストキャッシュ
+  private pendingRequests: Set<string> = new Set(); // 進行中のリクエスト追跡
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
+  }
+
+  // リクエストキーを生成
+  private getRequestKey(path: string, options: RequestInit): string {
+    const method = options.method || 'GET';
+    const body = options.body || '';
+    return `${method}:${path}:${body}`;
   }
 
   private async request<T>(
     path: string,
     options: RequestInit = {}
   ): Promise<T> {
+    const requestKey = this.getRequestKey(path, options);
+    
+    // 同じリクエストが既に進行中の場合は、そのPromiseを返す
+    if (this.requestCache.has(requestKey)) {
+      console.log(`[API] Reusing cached request for: ${requestKey}`);
+      return this.requestCache.get(requestKey);
+    }
+
+    // 重複リクエストをチェック
+    if (this.pendingRequests.has(requestKey)) {
+      console.log(`[API] Blocking duplicate request for: ${requestKey}`);
+      throw new Error('Duplicate request blocked');
+    }
+
+    this.pendingRequests.add(requestKey);
+
     const token = getToken();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -44,17 +69,32 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${this.baseURL}${path}`, {
+    // Promise を作成してキャッシュに保存
+    const requestPromise = fetch(`${this.baseURL}${path}`, {
       ...options,
       headers,
+    }).then(async (response) => {
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(error.message || `HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    }).finally(() => {
+      // リクエスト完了後にキャッシュと進行中リストから削除
+      this.requestCache.delete(requestKey);
+      this.pendingRequests.delete(requestKey);
     });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    // GET リクエストのみキャッシュする（短時間）
+    if (!options.method || options.method === 'GET') {
+      this.requestCache.set(requestKey, requestPromise);
+      // 1秒後にキャッシュから削除
+      setTimeout(() => {
+        this.requestCache.delete(requestKey);
+      }, 1000);
     }
 
-    return response.json();
+    return requestPromise;
   }
 
   // 認証API

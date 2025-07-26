@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ChatArea from './components/ChatArea';
 import Header from './components/Header';
 import { LoadingOverlay, LoadingSpinner } from './components/loading';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
+import { AlertProvider } from './contexts/AlertContext';
 import { api, getToken } from './services/api';
 import { AuthState, Chat, Message } from './types';
-import { AlertProvider } from './contexts/AlertContext';
 
 // デモ用のAI応答生成関数
 const generateAIResponse = (userMessage: string): string => {
@@ -53,26 +53,56 @@ function AppContent() {
   const [isUserInfoLoading, setIsUserInfoLoading] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
 
+  // 認証チェックの重複実行を防ぐためのref
+  const authCheckInProgress = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   // 現在のチャットを取得
   const currentChat = chats.find(chat => chat.id === currentChatId) || null;
 
   // 初期化時にトークンをチェック
   useEffect(() => {
+    let isMounted = true; // マウント状態の追跡
+    
     const checkAuth = async () => {
+      // 既に認証チェックが進行中の場合は何もしない
+      if (authCheckInProgress.current) {
+        return;
+      }
+
+      authCheckInProgress.current = true;
+      
+      // 前回のリクエストがあればキャンセル
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // 新しいAbortControllerを作成
+      abortControllerRef.current = new AbortController();
+
       const token = getToken();
       if (token) {
         try {
           const user = await api.getCurrentUser();
-          setAuthState({
-            user: {
-              id: user.userId,
-              email: user.email,
-              name: user.name
-            },
-            isAuthenticated: true,
-            isLoading: false
-          });
+          
+          // コンポーネントがマウントされており、リクエストがキャンセルされていないかチェック
+          if (isMounted && !abortControllerRef.current?.signal.aborted) {
+            setAuthState({
+              user: {
+                id: user.userId,
+                email: user.email,
+                name: user.name
+              },
+              isAuthenticated: true,
+              isLoading: false
+            });
+          }
         } catch (error) {
+          // リクエストがキャンセルされた場合は何もしない
+          if (abortControllerRef.current?.signal.aborted || !isMounted) {
+            return;
+          }
+          
           // トークンが無効な場合
           api.logout();
           setAuthState({
@@ -82,35 +112,61 @@ function AppContent() {
           });
         }
       } else {
-        setAuthState({
-          user: null,
-          isAuthenticated: false,
-          isLoading: false
-        });
+        if (isMounted) {
+          setAuthState({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false
+          });
+        }
       }
+      
+      authCheckInProgress.current = false;
     };
     
     checkAuth();
+
+    // クリーンアップ関数
+    return () => {
+      isMounted = false; // アンマウント時にフラグを無効化
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      authCheckInProgress.current = false;
+    };
   }, []);
 
   // ログイン処理
   const handleLogin = async (_email: string, _password: string) => {
     // Login コンポーネント内で既にAPIを呼び出しているので、
-    // ここではユーザー情報を再取得
+    // ここではユーザー情報を再取得せずに、ログイン成功を処理
     setIsUserInfoLoading(true);
     try {
-      const user = await api.getCurrentUser();
-      setAuthState({
-        user: {
-          id: user.userId,
-          email: user.email,
-          name: user.name
-        },
-        isAuthenticated: true,
-        isLoading: false
-      });
+      // ログイン後は認証チェックの重複を防ぐためにフラグをリセット
+      authCheckInProgress.current = false;
+      
+      // トークンが既に設定されているはずなので、ユーザー情報を取得
+      // ただし、重複チェックを避けるため、既に進行中でないことを確認
+      if (!authCheckInProgress.current) {
+        const user = await api.getCurrentUser();
+        setAuthState({
+          user: {
+            id: user.userId,
+            email: user.email,
+            name: user.name
+          },
+          isAuthenticated: true,
+          isLoading: false
+        });
+      }
     } catch (error) {
       console.error('Failed to get user info:', error);
+      // エラーの場合は認証状態をリセット
+      setAuthState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false
+      });
     } finally {
       setIsUserInfoLoading(false);
     }
