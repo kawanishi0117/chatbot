@@ -70,18 +70,30 @@ def get_authenticated_user(headers: Dict[str, str]) -> Optional[Dict[str, Any]]:
     Returns:
         ユーザー情報辞書 (未認証の場合はNone)
     """
+    import logging
+    logger = logging.getLogger()
+    
     session = get_authenticated_session(headers)
     if session is None:
+        logger.info("No valid session found")
         return None
 
     try:
-        user_resp = _table.get_item(
-            Key={"PK": f"USER#{session['email']}", "SK": "PROFILE"}
-        )
+        user_key = {"PK": f"USER#{session['email']}", "SK": "PROFILE"}
+        logger.info(f"Looking up user with key: {user_key}")
+        
+        user_resp = _table.get_item(Key=user_key)
         if "Item" not in user_resp:
+            logger.info(f"No user found for email: {session['email']}")
             return None
-        return user_resp["Item"]
-    except ClientError:
+            
+        user_data = user_resp["Item"]
+        logger.info(f"Found user data from DB: {user_data}")
+        logger.info(f"User role from DB: {user_data.get('role')} (type: {type(user_data.get('role'))})")
+        
+        return user_data
+    except ClientError as e:
+        logger.error(f"DynamoDB error in get_authenticated_user: {e}")
         return None
 
 

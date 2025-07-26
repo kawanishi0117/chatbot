@@ -372,6 +372,12 @@ class UserHandler:
                     401, "Unauthorized", "認証トークンが必要です"
                 )
 
+            # デバッグログ: 取得したユーザー情報を出力
+            logger.info(f"Retrieved user data: {user}")
+            logger.info(
+                f"User role field: {user.get('role')} (type: {type(user.get('role'))})"
+            )
+
             response_data = {
                 "userId": user["userId"],
                 "email": user["email"],
@@ -380,6 +386,10 @@ class UserHandler:
                 "createdAt": self._convert_decimal_to_int(user.get("createdAt", 0)),
                 "updatedAt": self._convert_decimal_to_int(user.get("updatedAt", 0)),
             }
+
+            # デバッグログ: レスポンスデータを出力
+            logger.info(f"Response data: {response_data}")
+
             return create_success_response(response_data)
         except Exception as e:
             logger.error(f"Error getting current user: {e}")

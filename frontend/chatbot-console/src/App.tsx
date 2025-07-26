@@ -34,6 +34,7 @@ function AppContent() {
   const [isSavingBot, setIsSavingBot] = useState(false);
   const [isLoadingBots, setIsLoadingBots] = useState(false);
   const [isDeletingBot, setIsDeletingBot] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Get current view from URL path
   const getCurrentView = () => {
@@ -221,11 +222,10 @@ function AppContent() {
   };
 
   const handleLogout = async () => {
+    setIsLoggingOut(true);
     try {
       await api.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
+      // ログアウト成功後に状態をリセット
       setAuthState({
         user: null,
         isAuthenticated: false,
@@ -233,6 +233,18 @@ function AppContent() {
       });
       setChatbots([]);
       setSelectedChatbot(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+      // エラーが発生してもログアウト状態にする
+      setAuthState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false
+      });
+      setChatbots([]);
+      setSelectedChatbot(null);
+    } finally {
+      setIsLoggingOut(false);
       navigate('/bots');
     }
   };
@@ -598,6 +610,7 @@ function AppContent() {
         onLogout={handleLogout}
         onToggleSidebar={handleToggleSidebar}
         isSidebarOpen={isSidebarOpen}
+        isLoggingOut={isLoggingOut}
         onUserUpdate={handleUserUpdate}
       />
       
