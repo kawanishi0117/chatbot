@@ -83,3 +83,18 @@ def get_authenticated_user(headers: Dict[str, str]) -> Optional[Dict[str, Any]]:
         return user_resp["Item"]
     except ClientError:
         return None
+
+
+def get_authenticated_admin(headers: Dict[str, str]) -> Optional[Dict[str, Any]]:
+    """認証済み管理者ユーザー情報を取得する
+
+    Args:
+        headers: リクエストヘッダー
+
+    Returns:
+        管理者ユーザー情報辞書 (未認証または管理者でない場合はNone)
+    """
+    user = get_authenticated_user(headers)
+    if user and user.get("role") == "admin":
+        return user
+    return None

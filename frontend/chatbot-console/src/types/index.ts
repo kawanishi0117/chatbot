@@ -44,7 +44,7 @@ export interface UserAccess {
   id: string;
   chatbotId: string;
   userId: string;
-  permission: 'read' | 'write' | 'admin';
+  permission: 'general' | 'admin';
   createdAt: string;
   updatedAt: string;
 }

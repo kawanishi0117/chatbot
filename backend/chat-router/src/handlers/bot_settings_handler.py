@@ -21,12 +21,14 @@ try:
         create_success_response,
         create_error_response,
     )
+    from common.auth_utils import get_authenticated_user, get_authenticated_admin
     from handlers.bot_validator import BotValidator
 except ImportError:
     from ..common.responses import (
         create_success_response,
         create_error_response,
     )
+    from ..common.auth_utils import get_authenticated_user, get_authenticated_admin
     from .bot_validator import BotValidator
 
 # ログ設定
@@ -65,6 +67,7 @@ class BotSettingsHandler:
         path: str,
         body: Union[str, Dict],
         query_params: Dict[str, str],
+        headers: Dict[str, str],
     ) -> Dict[str, Any]:
         """ボット設定APIリクエストのハンドリング
 
@@ -87,15 +90,15 @@ class BotSettingsHandler:
 
             # HTTPメソッドとパスに基づく処理の振り分け
             if http_method == "POST" and path == "/api/bots":
-                return self._handle_create_bot(body)
+                return self._handle_create_bot(body, headers)
             elif http_method == "GET" and path == "/api/bots":
-                return self._handle_list_bots(query_params)
+                return self._handle_list_bots(query_params, headers)
             elif http_method == "GET" and bot_id:
                 return self._handle_get_bot(bot_id)
             elif http_method == "PUT" and bot_id:
-                return self._handle_update_bot(bot_id, body)
+                return self._handle_update_bot(bot_id, body, headers)
             elif http_method == "DELETE" and bot_id:
-                return self._handle_delete_bot(bot_id)
+                return self._handle_delete_bot(bot_id, headers)
             else:
                 return create_error_response(404, "Not Found", "Unknown API endpoint")
 
@@ -105,16 +108,24 @@ class BotSettingsHandler:
                 500, "Internal Server Error", "ボット設定の処理中にエラーが発生しました"
             )
 
-    def _handle_create_bot(self, body: Union[str, Dict]) -> Dict[str, Any]:
+    def _handle_create_bot(
+        self, body: Union[str, Dict], headers: Dict[str, str]
+    ) -> Dict[str, Any]:
         """新しいボットの作成
 
         Args:
             body: リクエストボディ
+            headers: リクエストヘッダー
 
         Returns:
             作成結果のレスポンス
         """
         try:
+            # 管理者権限チェック
+            current_admin = get_authenticated_admin(headers)
+            if not current_admin:
+                return create_error_response(403, "Forbidden", "管理者権限が必要です")
+
             # リクエストボディをパース
             if isinstance(body, str):
                 data = json.loads(body)
@@ -138,7 +149,7 @@ class BotSettingsHandler:
                 "botId": bot_id,
                 "botName": data["botName"],
                 "description": data.get("description", ""),
-                "creatorId": data["creatorId"],
+                "creatorId": current_admin["userId"],
                 "createdAt": current_time,
                 "updatedAt": current_time,
                 "isActive": data.get("isActive", True),
@@ -147,7 +158,22 @@ class BotSettingsHandler:
             # DynamoDBに保存
             table.put_item(Item=bot_data)
 
-            logger.info(f"Bot created successfully: {bot_id}")
+            # 作成者に管理者権限でアクセス権限を付与
+            access_data = {
+                "PK": f"BOT#{bot_id}",
+                "SK": f"ACCESS#{current_admin['userId']}",
+                "accessId": str(uuid.uuid4()),
+                "botId": bot_id,
+                "userId": current_admin["userId"],
+                "permission": "admin",
+                "createdAt": current_time,
+                "updatedAt": current_time,
+                "invitedBy": "",  # 作成者は招待経由ではない
+            }
+
+            table.put_item(Item=access_data)
+
+            logger.info(f"Bot created successfully: {bot_id}, creator access granted")
             return create_success_response(bot_data)
 
         except json.JSONDecodeError:
@@ -163,54 +189,104 @@ class BotSettingsHandler:
                 500, "Internal Server Error", "予期しないエラーが発生しました"
             )
 
-    def _handle_list_bots(self, query_params: Dict[str, str]) -> Dict[str, Any]:
-        """ボット一覧の取得
+    def _handle_list_bots(
+        self, query_params: Dict[str, str], headers: Dict[str, str]
+    ) -> Dict[str, Any]:
+        """ボット一覧の取得（認証ユーザーがアクセス権限を持つボットのみ）
 
         Args:
             query_params: クエリパラメータ
+            headers: リクエストヘッダー
 
         Returns:
             ボット一覧のレスポンス
         """
         try:
-            creator_id = query_params.get("creatorId")
+            # 認証チェック
+            current_user = get_authenticated_user(headers)
+            if not current_user:
+                return create_error_response(401, "Unauthorized", "認証が必要です")
 
-            if creator_id:
-                # 特定の作成者のボットを取得
-                response = table.query(
-                    IndexName="creatorId-createdAt-index",
-                    KeyConditionExpression="creatorId = :creator_id",
-                    ExpressionAttributeValues={":creator_id": creator_id},
-                    ScanIndexForward=False,  # createdAtで降順ソート
-                )
-            else:
-                # 全てのボットを取得（Scan操作）
+            # 管理者の場合は全ボット一覧を返す
+            if current_user.get("role") == "admin":
+                # 管理者は全ボット一覧を取得
                 response = table.scan(
-                    FilterExpression="SK = :sk",
-                    ExpressionAttributeValues={":sk": "CONFIG"},
+                    FilterExpression="begins_with(PK, :pk) AND SK = :sk",
+                    ExpressionAttributeValues={
+                        ":pk": "BOT#",
+                        ":sk": "CONFIG",
+                    },
                 )
 
-            items = response.get("Items", [])
+                bot_list = []
+                for item in response.get("Items", []):
+                    try:
+                        bot_id = item["PK"].replace("BOT#", "")
+                        bot_data = {
+                            "botId": item.get("botId", bot_id),
+                            "botName": item["botName"],
+                            "description": item.get("description", ""),
+                            "creatorId": item["creatorId"],
+                            "createdAt": self._convert_decimal_to_int(
+                                item["createdAt"]
+                            ),
+                            "updatedAt": self._convert_decimal_to_int(
+                                item["updatedAt"]
+                            ),
+                            "isActive": item.get("isActive", True),
+                        }
+                        bot_list.append(bot_data)
+                    except Exception as e:
+                        logger.warning(f"Failed to parse bot data: {e}")
+                        continue
 
-            # レスポンス形式を調整
-            bot_list = []
-            for item in items:
-                # PKから実際のbot_idを抽出（BOT#プレフィックスを除去）
-                bot_id = (
-                    item["PK"].replace("BOT#", "")
-                    if item["PK"].startswith("BOT#")
-                    else item["PK"]
+            else:
+                # 一般ユーザーはアクセス権限を持つボットのみ取得
+                # ユーザーのアクセス権限を取得
+                access_response = table.scan(
+                    FilterExpression="begins_with(SK, :sk) AND userId = :user_id",
+                    ExpressionAttributeValues={
+                        ":sk": "ACCESS#",
+                        ":user_id": current_user["userId"],
+                    },
                 )
-                bot_data = {
-                    "botId": item.get("botId", bot_id),
-                    "botName": item["botName"],
-                    "description": item.get("description", ""),
-                    "creatorId": item["creatorId"],
-                    "createdAt": self._convert_decimal_to_int(item["createdAt"]),
-                    "updatedAt": self._convert_decimal_to_int(item["updatedAt"]),
-                    "isActive": item.get("isActive", True),
-                }
-                bot_list.append(bot_data)
+
+                accessible_bot_ids = []
+                for access_item in access_response.get("Items", []):
+                    bot_id = access_item["PK"].replace("BOT#", "")
+                    accessible_bot_ids.append(bot_id)
+
+                if not accessible_bot_ids:
+                    # アクセス権限を持つボットがない場合
+                    return create_success_response({"bots": [], "count": 0})
+
+                # アクセス権限を持つボットの詳細情報を取得
+                bot_list = []
+                for bot_id in accessible_bot_ids:
+                    try:
+                        bot_response = table.get_item(
+                            Key={"PK": f"BOT#{bot_id}", "SK": "CONFIG"}
+                        )
+
+                        if "Item" in bot_response:
+                            item = bot_response["Item"]
+                            bot_data = {
+                                "botId": item.get("botId", bot_id),
+                                "botName": item["botName"],
+                                "description": item.get("description", ""),
+                                "creatorId": item["creatorId"],
+                                "createdAt": self._convert_decimal_to_int(
+                                    item["createdAt"]
+                                ),
+                                "updatedAt": self._convert_decimal_to_int(
+                                    item["updatedAt"]
+                                ),
+                                "isActive": item.get("isActive", True),
+                            }
+                            bot_list.append(bot_data)
+                    except Exception as e:
+                        logger.warning(f"Failed to get bot details for {bot_id}: {e}")
+                        continue
 
             return create_success_response({"bots": bot_list, "count": len(bot_list)})
 
@@ -277,17 +353,25 @@ class BotSettingsHandler:
                 500, "Internal Server Error", "予期しないエラーが発生しました"
             )
 
-    def _handle_update_bot(self, bot_id: str, body: Union[str, Dict]) -> Dict[str, Any]:
+    def _handle_update_bot(
+        self, bot_id: str, body: Union[str, Dict], headers: Dict[str, str]
+    ) -> Dict[str, Any]:
         """ボット設定の更新
 
         Args:
             bot_id: ボットID
             body: 更新データ
+            headers: リクエストヘッダー
 
         Returns:
             更新結果のレスポンス
         """
         try:
+            # 管理者権限チェック
+            current_admin = get_authenticated_admin(headers)
+            if not current_admin:
+                return create_error_response(403, "Forbidden", "管理者権限が必要です")
+
             # バリデーション
             if not self.validator.validate_bot_id(bot_id):
                 return create_error_response(
@@ -372,16 +456,24 @@ class BotSettingsHandler:
                 500, "Internal Server Error", "予期しないエラーが発生しました"
             )
 
-    def _handle_delete_bot(self, bot_id: str) -> Dict[str, Any]:
+    def _handle_delete_bot(
+        self, bot_id: str, headers: Dict[str, str]
+    ) -> Dict[str, Any]:
         """ボットの削除
 
         Args:
             bot_id: ボットID
+            headers: リクエストヘッダー
 
         Returns:
             削除結果のレスポンス
         """
         try:
+            # 管理者権限チェック
+            current_admin = get_authenticated_admin(headers)
+            if not current_admin:
+                return create_error_response(403, "Forbidden", "管理者権限が必要です")
+
             # バリデーション
             if not self.validator.validate_bot_id(bot_id):
                 return create_error_response(

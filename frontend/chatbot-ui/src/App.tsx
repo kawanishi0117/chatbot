@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import ChatArea from './components/ChatArea';
 import Header from './components/Header';
-import InvitationAccept from './components/InvitationAccept';
+
 import { LoadingOverlay, LoadingSpinner } from './components/loading';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
@@ -51,6 +51,13 @@ function MainApp() {
   });
 
   const [chats, setChats] = useState<Chat[]>([]);
+  const [bots, setBots] = useState<Array<{
+    botId: string;
+    botName: string;
+    description: string;
+    isActive: boolean;
+  }>>([]);
+  const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isUserInfoLoading, setIsUserInfoLoading] = useState(false);
@@ -83,6 +90,11 @@ function MainApp() {
   // サイドバートグル処理
   const handleToggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  // ボット選択処理
+  const handleSelectBot = (botId: string) => {
+    setSelectedBotId(botId);
   };
 
   // 初期化時にトークンをチェック
@@ -121,6 +133,16 @@ function MainApp() {
               isAuthenticated: true,
               isLoading: false
             });
+
+            // ユーザー認証成功後にボット一覧を取得
+            try {
+              const botsResponse = await api.getBots();
+              if (isMounted && !abortControllerRef.current?.signal.aborted) {
+                setBots(botsResponse.bots.filter(bot => bot.isActive));
+              }
+            } catch (error) {
+              console.error('Failed to load bots:', error);
+            }
           }
         } catch (error) {
           // リクエストがキャンセルされた場合は何もしない
@@ -392,6 +414,9 @@ function MainApp() {
       <div className="flex-1 flex overflow-hidden">
         {/* サイドバー */}
         <Sidebar
+          bots={bots}
+          selectedBotId={selectedBotId}
+          onSelectBot={handleSelectBot}
           chats={chats}
           currentChatId={currentChatId}
           onSelectChat={handleSelectChat}
@@ -428,7 +453,7 @@ function App() {
   return (
     <AlertProvider>
       <Routes>
-        <Route path="/invite/:invitationId" element={<InvitationAccept />} />
+
         <Route path="/" element={<MainApp />} />
         <Route path="/chat/:chatId" element={<MainApp />} />
       </Routes>

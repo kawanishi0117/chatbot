@@ -96,7 +96,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             )
         elif (
             path.startswith("/api/auth")
-            or path.startswith("/api/invitations/")
             or (
                 path.startswith("/api/bots/")
                 and ("/users" in path or "/invite" in path)
@@ -117,7 +116,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 "Bot settings API request: path=%s, method=%s", path, http_method
             )
             bot_handler = BotSettingsHandler()
-            return bot_handler.handle_request(http_method, path, body, query_params)
+            headers = event.get("headers", {}) or {}
+            return bot_handler.handle_request(http_method, path, body, query_params, headers)
         elif path == "/health":
             # ヘルスチェック用エンドポイント
             logger.info("Health check endpoint accessed")

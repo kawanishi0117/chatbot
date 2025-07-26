@@ -23,12 +23,14 @@ try:
         extract_bearer_token,
         get_authenticated_session,
         get_authenticated_user,
+        get_authenticated_admin,
     )
 except ImportError:
     from ..common.auth_utils import (
         extract_bearer_token,
         get_authenticated_session,
         get_authenticated_user,
+        get_authenticated_admin,
     )
 
 # Lambda実行環境でのモジュールインポートを確保
@@ -121,16 +123,7 @@ class UserHandler:
             ):
                 bot_id = path.split("/")[-2]
                 return self._handle_create_invitation(bot_id, body, headers)
-            elif http_method == "GET" and path.startswith("/api/invitations/"):
-                invitation_id = path.split("/")[-1]
-                return self._handle_get_invitation(invitation_id)
-            elif (
-                http_method == "POST"
-                and path.startswith("/api/invitations/")
-                and path.endswith("/accept")
-            ):
-                invitation_id = path.split("/")[-2]
-                return self._handle_accept_invitation(invitation_id, headers)
+
             elif (
                 http_method == "PUT"
                 and path.startswith("/api/bots/")
@@ -590,6 +583,25 @@ class UserHandler:
             if not current_user:
                 return create_error_response(401, "Unauthorized", "認証が必要です")
 
+            # userIdフィールドの存在確認
+            if "userId" not in current_user:
+                logger.error(f"userId field not found in current_user: {current_user}")
+                return create_error_response(
+                    500, "Internal Server Error", "ユーザー情報が不正です"
+                )
+
+            # 現在のユーザーがこのボットへのアクセス権限を持っているかチェック
+            user_id = current_user["userId"]
+
+            access_check = table.get_item(
+                Key={"PK": f"BOT#{bot_id}", "SK": f"ACCESS#{user_id}"}
+            )
+
+            if "Item" not in access_check:
+                return create_error_response(
+                    403, "Forbidden", "このボットへのアクセス権限がありません"
+                )
+
             # ボットのユーザー一覧を取得
             response = table.query(
                 KeyConditionExpression="PK = :pk AND begins_with(SK, :sk)",
@@ -620,25 +632,41 @@ class UserHandler:
                     continue
 
                 if user_info:
+                    # Decimal型をint型に変換
+                    access_created_at = item.get("createdAt", int(time.time() * 1000))
+                    access_updated_at = item.get("updatedAt", int(time.time() * 1000))
+                    user_created_at = user_info.get(
+                        "createdAt", int(time.time() * 1000)
+                    )
+                    user_updated_at = user_info.get(
+                        "updatedAt", int(time.time() * 1000)
+                    )
+
+                    # Decimal型の場合はint型に変換
+                    if hasattr(access_created_at, "__float__"):
+                        access_created_at = int(access_created_at)
+                    if hasattr(access_updated_at, "__float__"):
+                        access_updated_at = int(access_updated_at)
+                    if hasattr(user_created_at, "__float__"):
+                        user_created_at = int(user_created_at)
+                    if hasattr(user_updated_at, "__float__"):
+                        user_updated_at = int(user_updated_at)
+
                     users_with_access.append(
                         {
                             "id": item.get("accessId", str(uuid.uuid4())),
                             "chatbotId": bot_id,
                             "userId": user_id,
                             "permission": item.get("permission", "read"),
-                            "createdAt": item.get("createdAt", int(time.time() * 1000)),
-                            "updatedAt": item.get("updatedAt", int(time.time() * 1000)),
+                            "createdAt": access_created_at,
+                            "updatedAt": access_updated_at,
                             "user": {
                                 "id": user_id,
                                 "email": user_info.get("email", ""),
                                 "name": user_info.get("name", ""),
                                 "role": user_info.get("role", "user"),
-                                "createdAt": user_info.get(
-                                    "createdAt", int(time.time() * 1000)
-                                ),
-                                "updatedAt": user_info.get(
-                                    "updatedAt", int(time.time() * 1000)
-                                ),
+                                "createdAt": user_created_at,
+                                "updatedAt": user_updated_at,
                             },
                         }
                     )
@@ -655,7 +683,7 @@ class UserHandler:
     def _handle_create_invitation(
         self, bot_id: str, body: Union[str, Dict], headers: Dict[str, str]
     ) -> Dict[str, Any]:
-        """招待リンク作成
+        """ユーザー招待（メールアドレス指定）
 
         Args:
             bot_id: ボットID
@@ -663,13 +691,13 @@ class UserHandler:
             headers: リクエストヘッダー
 
         Returns:
-            招待リンクのレスポンス
+            招待結果のレスポンス
         """
         try:
-            # 認証チェック
-            current_user = self._authenticate_user(headers)
-            if not current_user:
-                return create_error_response(401, "Unauthorized", "認証が必要です")
+            # 管理者権限チェック（ユーザー招待は管理者のみ）
+            current_admin = get_authenticated_admin(headers)
+            if not current_admin:
+                return create_error_response(403, "Forbidden", "管理者権限が必要です")
 
             # リクエストボディをパース
             if isinstance(body, str):
@@ -677,226 +705,84 @@ class UserHandler:
             else:
                 data = body
 
-            email = data.get("email", "").lower()
-            permission = data.get("permission", "read")
+            # 必須フィールドの確認
+            email = data.get("email", "").lower().strip()
+            permission = data.get("permission", "general")
 
-            # バリデーション
-            if not email or "@" not in email:
+            if not email:
                 return create_error_response(
-                    400, "Bad Request", "有効なメールアドレスが必要です"
+                    400, "Bad Request", "メールアドレスは必須です"
                 )
 
-            if permission not in ["read", "write", "admin"]:
+            # バリデーション
+            if permission not in ["general", "admin"]:
                 return create_error_response(400, "Bad Request", "無効な権限レベルです")
 
-            # 招待IDを生成
-            invitation_id = str(uuid.uuid4())
-            current_time = int(time.time() * 1000)
-            expiry_time = int(time.time()) + (7 * 24 * 60 * 60)  # 7日後
+            # メールアドレスの形式チェック
+            if "@" not in email or len(email) < 5:
+                return create_error_response(
+                    400, "Bad Request", "有効なメールアドレスを入力してください"
+                )
 
-            # 招待情報を保存
-            invitation_data = {
-                "PK": f"INVITATION#{invitation_id}",
-                "SK": "INFO",
-                "invitationId": invitation_id,
+            # 招待対象ユーザーの存在確認
+            user_response = table.get_item(Key={"PK": f"USER#{email}", "SK": "PROFILE"})
+
+            if "Item" not in user_response:
+                return create_error_response(
+                    404,
+                    "Not Found",
+                    "指定されたメールアドレスのユーザーが見つかりません",
+                )
+
+            invited_user = user_response["Item"]
+            invited_user_id = invited_user["userId"]
+
+            # 既にアクセス権限があるかチェック
+            existing_access = table.get_item(
+                Key={"PK": f"BOT#{bot_id}", "SK": f"ACCESS#{invited_user_id}"}
+            )
+
+            if "Item" in existing_access:
+                return create_error_response(
+                    409, "Conflict", "このユーザーは既にボットにアクセス権限があります"
+                )
+
+            # アクセス権限を付与
+            current_time = int(time.time() * 1000)
+            access_data = {
+                "PK": f"BOT#{bot_id}",
+                "SK": f"ACCESS#{invited_user_id}",
+                "accessId": str(uuid.uuid4()),
                 "botId": bot_id,
-                "email": email,
+                "userId": invited_user_id,
                 "permission": permission,
-                "inviterId": current_user["userId"],
-                "inviterEmail": current_user["email"],
                 "createdAt": current_time,
-                "expiresAt": expiry_time,
-                "ttl": expiry_time,
-                "isUsed": False,
+                "updatedAt": current_time,
+                "invitedBy": current_admin["userId"],
             }
 
-            table.put_item(Item=invitation_data)
+            table.put_item(Item=access_data)
 
-            logger.info(f"Invitation created: {invitation_id} for {email}")
+            logger.info(
+                f"User {email} granted {permission} access to bot {bot_id} by {current_admin['email']}"
+            )
 
             return create_success_response(
                 {
-                    "invitationId": invitation_id,
-                    "invitationUrl": f"/invite/{invitation_id}",
-                    "email": email,
+                    "message": f"{email} にボットへのアクセス権限を付与しました",
+                    "userEmail": email,
+                    "userName": invited_user.get("name", ""),
                     "permission": permission,
-                    "expiresAt": expiry_time * 1000,
+                    "botId": bot_id,
                 }
             )
 
         except json.JSONDecodeError:
             return create_error_response(400, "Bad Request", "Invalid JSON format")
         except Exception as e:
-            logger.error(f"Error creating invitation: {e}")
+            logger.error(f"Error inviting user: {e}")
             return create_error_response(
-                500, "Internal Server Error", "招待リンクの作成に失敗しました"
-            )
-
-    def _handle_get_invitation(self, invitation_id: str) -> Dict[str, Any]:
-        """招待情報取得
-
-        Args:
-            invitation_id: 招待ID
-
-        Returns:
-            招待情報のレスポンス
-        """
-        try:
-            # 招待情報を取得
-            response = table.get_item(
-                Key={"PK": f"INVITATION#{invitation_id}", "SK": "INFO"}
-            )
-
-            if "Item" not in response:
-                return create_error_response(404, "Not Found", "招待が見つかりません")
-
-            invitation = response["Item"]
-
-            # 有効期限チェック
-            current_time = int(time.time())
-            if invitation.get("expiresAt", 0) < current_time:
-                return create_error_response(
-                    410, "Gone", "招待の有効期限が切れています"
-                )
-
-            # 使用済みチェック
-            if invitation.get("isUsed", False):
-                return create_error_response(
-                    410, "Gone", "この招待は既に使用されています"
-                )
-
-            return create_success_response(
-                {
-                    "invitationId": invitation["invitationId"],
-                    "botId": invitation["botId"],
-                    "email": invitation["email"],
-                    "permission": invitation["permission"],
-                    "inviterEmail": invitation.get("inviterEmail", ""),
-                    "createdAt": invitation["createdAt"],
-                    "expiresAt": invitation["expiresAt"] * 1000,
-                }
-            )
-
-        except Exception as e:
-            logger.error(f"Error getting invitation: {e}")
-            return create_error_response(
-                500, "Internal Server Error", "招待情報の取得に失敗しました"
-            )
-
-    def _handle_accept_invitation(
-        self, invitation_id: str, headers: Dict[str, str]
-    ) -> Dict[str, Any]:
-        """招待受諾処理
-
-        Args:
-            invitation_id: 招待ID
-            headers: リクエストヘッダー
-
-        Returns:
-            招待受諾結果のレスポンス
-        """
-        try:
-            # ユーザー認証（オプショナル - 未認証でも受諾可能）
-            current_user = self._authenticate_user(headers)
-
-            # 招待情報を取得
-            response = table.get_item(
-                Key={"PK": f"INVITATION#{invitation_id}", "SK": "INFO"}
-            )
-
-            if "Item" not in response:
-                return create_error_response(404, "Not Found", "招待が見つかりません")
-
-            invitation = response["Item"]
-
-            # 有効期限チェック
-            current_time = int(time.time())
-            if invitation.get("expiresAt", 0) < current_time:
-                return create_error_response(
-                    410, "Gone", "招待の有効期限が切れています"
-                )
-
-            # 使用済みチェック
-            if invitation.get("isUsed", False):
-                return create_error_response(
-                    410, "Gone", "この招待は既に使用されています"
-                )
-
-            # 招待されたメールアドレスのユーザーを取得または作成
-            invited_email = invitation["email"]
-            user_response = table.get_item(
-                Key={"PK": f"USER#{invited_email}", "SK": "PROFILE"}
-            )
-
-            if "Item" not in user_response:
-                # ユーザーが存在しない場合、仮ユーザーとして作成
-                user_id = str(uuid.uuid4())
-                current_time_ms = int(time.time() * 1000)
-
-                user_data = {
-                    "PK": f"USER#{invited_email}",
-                    "SK": "PROFILE",
-                    "userId": user_id,
-                    "email": invited_email,
-                    "name": invited_email.split("@")[0],  # メールアドレスから名前を生成
-                    "passwordHash": "",  # パスワード未設定
-                    "role": "user",
-                    "createdAt": current_time_ms,
-                    "updatedAt": current_time_ms,
-                    "isActive": True,
-                    "isInvited": True,  # 招待経由で作成されたユーザー
-                }
-
-                table.put_item(Item=user_data)
-                user = user_data
-            else:
-                user = user_response["Item"]
-
-            # ボットアクセス権限を付与
-            access_data = {
-                "PK": f"BOT#{invitation['botId']}",
-                "SK": f"ACCESS#{user['userId']}",
-                "accessId": str(uuid.uuid4()),
-                "botId": invitation["botId"],
-                "userId": user["userId"],
-                "permission": invitation["permission"],
-                "createdAt": int(time.time() * 1000),
-                "updatedAt": int(time.time() * 1000),
-                "invitedBy": invitation.get("inviterId", ""),
-            }
-
-            table.put_item(Item=access_data)
-
-            # 招待を使用済みにマーク
-            table.update_item(
-                Key={"PK": f"INVITATION#{invitation_id}", "SK": "INFO"},
-                UpdateExpression="SET isUsed = :used, usedAt = :used_at, usedBy = :used_by",
-                ExpressionAttributeValues={
-                    ":used": True,
-                    ":used_at": int(time.time() * 1000),
-                    ":used_by": user["userId"],
-                },
-            )
-
-            logger.info(f"Invitation accepted: {invitation_id} by {invited_email}")
-
-            return create_success_response(
-                {
-                    "message": "招待が正常に受諾されました。ボットにアクセスできるようになりました。",
-                    "botId": invitation["botId"],
-                    "permission": invitation["permission"],
-                    "user": {
-                        "userId": user["userId"],
-                        "email": user["email"],
-                        "name": user["name"],
-                    },
-                }
-            )
-
-        except Exception as e:
-            logger.error(f"Error accepting invitation: {e}")
-            return create_error_response(
-                500, "Internal Server Error", "招待の受諾に失敗しました"
+                500, "Internal Server Error", "ユーザーの招待に失敗しました"
             )
 
     def _handle_update_user_permission(
@@ -928,7 +814,7 @@ class UserHandler:
             new_permission = data.get("permission")
 
             # バリデーション
-            if new_permission not in ["read", "write", "admin"]:
+            if new_permission not in ["general", "admin"]:
                 return create_error_response(400, "Bad Request", "無効な権限レベルです")
 
             # 対象ユーザーのアクセス権限を更新

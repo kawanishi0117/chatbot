@@ -331,21 +331,58 @@ function AppContent() {
   // ボット詳細ページ用のコンポーネント
   const BotDetailRoute = ({ view }: { view: string }) => {
     const { botId } = useParams<{ botId: string }>();
+    const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+    const [isCheckingAccess, setIsCheckingAccess] = useState(false);
     
-    // URLのボットIDに基づいてselectedChatbotを設定
+    // ボットアクセス権限をチェック
     useEffect(() => {
-      if (botId && chatbots.length > 0) {
-        const bot = chatbots.find(b => b.id === botId);
-        if (bot && (!selectedChatbot || selectedChatbot.id !== botId)) {
-          setSelectedChatbot(bot);
-        } else if (!bot) {
-          // ボットが見つからない場合はボット一覧に戻る
+      const checkAccess = async () => {
+        if (!botId) return;
+        
+        setIsCheckingAccess(true);
+        try {
+          const accessCheck = await api.checkBotAccess(botId);
+          setHasAccess(accessCheck);
+          
+          if (!accessCheck) {
+            showAlert('このボットへのアクセス権限がありません', 'error');
+            navigate('/bots');
+            return;
+          }
+          
+          // アクセス権限がある場合、ボット一覧からボット情報を取得
+          if (chatbots.length > 0) {
+            const bot = chatbots.find(b => b.id === botId);
+            if (bot && (!selectedChatbot || selectedChatbot.id !== botId)) {
+              setSelectedChatbot(bot);
+            }
+          }
+        } catch (error: any) {
+          showAlert('アクセス権限の確認に失敗しました: ' + (error.message || 'Unknown error'), 'error');
           navigate('/bots');
+        } finally {
+          setIsCheckingAccess(false);
         }
+      };
+      
+      if (botId) {
+        checkAccess();
       }
-    }, [botId, chatbots, selectedChatbot, navigate]);
+    }, [botId, chatbots, selectedChatbot, navigate, showAlert]);
 
-    if (!botId || !selectedChatbot || selectedChatbot.id !== botId) {
+    // アクセス権限チェック中の表示
+    if (isCheckingAccess || hasAccess === null) {
+      return (
+        <div className="h-full flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">アクセス権限を確認中...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!botId || !hasAccess || !selectedChatbot || selectedChatbot.id !== botId) {
       return <Navigate to="/bots" replace />;
     }
 
@@ -516,8 +553,42 @@ function AppContent() {
     );
   }
 
-  if (!authState.isAuthenticated) {
+  if (!authState.isAuthenticated || !authState.user) {
     return <Login onLogin={handleLogin} />;
+  }
+
+  // 管理者権限チェック
+  if (authState.user.role !== 'admin') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
+          <div className="w-16 h-16 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
+            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">アクセス権限がありません</h1>
+          <p className="text-gray-600 mb-6">
+            管理画面へのアクセスには管理者権限が必要です。<br />
+            現在のアカウント（{authState.user.email}）は一般ユーザーです。
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={() => {
+                api.logout();
+                window.location.reload();
+              }}
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              別のアカウントでログイン
+            </button>
+            <p className="text-sm text-gray-500">
+              管理者権限が必要な場合は、システム管理者にお問い合わせください。
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

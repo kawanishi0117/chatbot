@@ -26,7 +26,6 @@ export const removeToken = (): void => {
 class ApiClient {
   private baseURL: string;
   private requestCache: Map<string, Promise<any>> = new Map(); // リクエストキャッシュ
-  private pendingRequests: Set<string> = new Set(); // 進行中のリクエスト追跡
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
@@ -51,14 +50,6 @@ class ApiClient {
       return this.requestCache.get(requestKey);
     }
 
-    // 重複リクエストをチェック
-    if (this.pendingRequests.has(requestKey)) {
-      console.log(`[API] Blocking duplicate request for: ${requestKey}`);
-      throw new Error('Duplicate request blocked');
-    }
-
-    this.pendingRequests.add(requestKey);
-
     const token = getToken();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -80,9 +71,8 @@ class ApiClient {
       }
       return response.json();
     }).finally(() => {
-      // リクエスト完了後にキャッシュと進行中リストから削除
+      // リクエスト完了後にキャッシュから削除
       this.requestCache.delete(requestKey);
-      this.pendingRequests.delete(requestKey);
     });
 
     // GET リクエストのみキャッシュする（短時間）
@@ -254,6 +244,36 @@ class ApiClient {
     return response;
   }
 
+  // ボットアクセス権限チェック
+  async checkBotAccess(botId: string): Promise<boolean> {
+    try {
+      const response = await this.request<Array<{
+        id: string;
+        chatbotId: string;
+        userId: string;
+        permission: 'read' | 'write' | 'admin';
+        createdAt: number;
+        updatedAt: number;
+        user: {
+          id: string;
+          email: string;
+          name: string;
+          role: string;
+          createdAt: number;
+          updatedAt: number;
+        };
+      }>>(`/api/bots/${botId}/users`, {
+        method: 'GET',
+      });
+      return true; // アクセス権限があればユーザー一覧を取得できる
+    } catch (error: any) {
+      if (error.message && (error.message.includes('Forbidden') || error.message.includes('403'))) {
+        return false; // アクセス権限なし
+      }
+      throw error; // その他のエラーは再スロー
+    }
+  }
+
   // ユーザー管理API
   async getBotUsers(botId: string) {
     const response = await this.request<Array<{
@@ -277,13 +297,13 @@ class ApiClient {
     return response;
   }
 
-  async createInvitation(botId: string, email: string, permission: 'read' | 'write' | 'admin') {
+  async inviteUserByEmail(botId: string, email: string, permission: 'general' | 'admin') {
     const response = await this.request<{
-      invitationId: string;
-      invitationUrl: string;
-      email: string;
+      message: string;
+      userEmail: string;
+      userName: string;
       permission: string;
-      expiresAt: number;
+      botId: string;
     }>(`/api/bots/${botId}/invite`, {
       method: 'POST',
       body: JSON.stringify({ email, permission }),
@@ -291,38 +311,9 @@ class ApiClient {
     return response;
   }
 
-  async getInvitation(invitationId: string) {
-    const response = await this.request<{
-      invitationId: string;
-      botId: string;
-      email: string;
-      permission: string;
-      inviterEmail: string;
-      createdAt: number;
-      expiresAt: number;
-    }>(`/api/invitations/${invitationId}`, {
-      method: 'GET',
-    });
-    return response;
-  }
 
-  async acceptInvitation(invitationId: string) {
-    const response = await this.request<{
-      message: string;
-      botId: string;
-      permission: string;
-      user: {
-        userId: string;
-        email: string;
-        name: string;
-      };
-    }>(`/api/invitations/${invitationId}/accept`, {
-      method: 'POST',
-    });
-    return response;
-  }
 
-  async updateUserPermission(botId: string, userId: string, permission: 'read' | 'write' | 'admin') {
+  async updateUserPermission(botId: string, userId: string, permission: 'general' | 'admin') {
     const response = await this.request<{
       message: string;
       userId: string;

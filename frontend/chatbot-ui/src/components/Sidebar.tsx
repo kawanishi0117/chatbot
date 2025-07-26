@@ -1,8 +1,18 @@
-import { Edit3, MessageCircle, Plus, Trash2 } from 'lucide-react';
+import { Bot, Edit3, MessageCircle, Plus, Trash2 } from 'lucide-react';
 import React from 'react';
 import { Chat } from '../types';
 
+interface Bot {
+  botId: string;
+  botName: string;
+  description: string;
+  isActive: boolean;
+}
+
 interface SidebarProps {
+  bots: Bot[];
+  selectedBotId: string | null;
+  onSelectBot: (botId: string) => void;
   chats: Chat[];
   currentChatId: string | null;
   onSelectChat: (chatId: string) => void;
@@ -13,6 +23,9 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
+  bots,
+  selectedBotId,
+  onSelectBot,
   chats,
   currentChatId,
   onSelectChat,
@@ -53,11 +66,38 @@ const Sidebar: React.FC<SidebarProps> = ({
         } lg:translate-x-0 lg:static lg:h-full`}
       >
         <div className="flex flex-col h-full">
+          {/* ボット選択セクション */}
+          <div className="p-3 border-b border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
+              <Bot className="w-4 h-4 mr-1" />
+              ボット選択
+            </h3>
+            {bots.length === 0 ? (
+              <div className="text-xs text-gray-500 text-center py-2">
+                アクセス可能なボットがありません
+              </div>
+            ) : (
+              <select
+                value={selectedBotId || ''}
+                onChange={(e) => onSelectBot(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              >
+                <option value="">ボットを選択してください</option>
+                {bots.map((bot) => (
+                  <option key={bot.botId} value={bot.botId}>
+                    {bot.botName}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
           {/* 新しいチャットボタン */}
           <div className="p-3 border-b border-gray-200">
             <button
               onClick={onCreateChat}
-              className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              disabled={!selectedBotId}
+              className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4" />
               <span>新しいチャット</span>

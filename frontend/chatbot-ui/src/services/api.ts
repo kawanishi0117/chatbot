@@ -26,7 +26,6 @@ export const removeToken = (): void => {
 class ApiClient {
   private baseURL: string;
   private requestCache: Map<string, Promise<any>> = new Map(); // リクエストキャッシュ
-  private pendingRequests: Set<string> = new Set(); // 進行中のリクエスト追跡
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
@@ -51,14 +50,6 @@ class ApiClient {
       return this.requestCache.get(requestKey);
     }
 
-    // 重複リクエストをチェック
-    if (this.pendingRequests.has(requestKey)) {
-      console.log(`[API] Blocking duplicate request for: ${requestKey}`);
-      throw new Error('Duplicate request blocked');
-    }
-
-    this.pendingRequests.add(requestKey);
-
     const token = getToken();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -80,9 +71,8 @@ class ApiClient {
       }
       return response.json();
     }).finally(() => {
-      // リクエスト完了後にキャッシュと進行中リストから削除
+      // リクエスト完了後にキャッシュから削除
       this.requestCache.delete(requestKey);
-      this.pendingRequests.delete(requestKey);
     });
 
     // GET リクエストのみキャッシュする（短時間）
@@ -168,6 +158,25 @@ class ApiClient {
     return response;
   }
 
+  // ボット一覧API
+  async getBots() {
+    const response = await this.request<{
+      bots: Array<{
+        botId: string;
+        botName: string;
+        description: string;
+        creatorId: string;
+        createdAt: number;
+        updatedAt: number;
+        isActive: boolean;
+      }>;
+      count: number;
+    }>('/api/bots', {
+      method: 'GET',
+    });
+    return response;
+  }
+
   // チャット用Webhook API
   async sendMessage(message: string, roomId: string) {
     const response = await this.request<{
@@ -187,37 +196,7 @@ class ApiClient {
     return response;
   }
 
-  // 招待API
-  async getInvitation(invitationId: string) {
-    const response = await this.request<{
-      invitationId: string;
-      botId: string;
-      email: string;
-      permission: string;
-      inviterEmail: string;
-      createdAt: number;
-      expiresAt: number;
-    }>(`/api/invitations/${invitationId}`, {
-      method: 'GET',
-    });
-    return response;
-  }
 
-  async acceptInvitation(invitationId: string) {
-    const response = await this.request<{
-      message: string;
-      botId: string;
-      permission: string;
-      user: {
-        userId: string;
-        email: string;
-        name: string;
-      };
-    }>(`/api/invitations/${invitationId}/accept`, {
-      method: 'POST',
-    });
-    return response;
-  }
 }
 
 // APIクライアントのインスタンスをエクスポート
