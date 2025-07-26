@@ -7,11 +7,20 @@ import reportWebVitals from './reportWebVitals';
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// React StrictModeの制御
+// 開発環境でAPI重複実行問題がある場合は環境変数で無効化可能
+const shouldUseStrictMode = import.meta.env.VITE_DISABLE_STRICT_MODE !== 'true';
+
+if (shouldUseStrictMode) {
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+} else {
+  console.warn('[開発環境] React StrictModeが無効化されています。本番環境では有効化してください。');
+  root.render(<App />);
+}
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))

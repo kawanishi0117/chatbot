@@ -4,9 +4,9 @@ import Header from './components/Header';
 import { LoadingOverlay, LoadingSpinner } from './components/loading';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
+import { AlertProvider } from './contexts/AlertContext';
 import { api, getToken } from './services/api';
 import { AuthState, Chat, Message } from './types';
-import { AlertProvider } from './contexts/AlertContext';
 
 // デモ用のAI応答生成関数
 const generateAIResponse = (userMessage: string): string => {
@@ -62,6 +62,8 @@ function AppContent() {
 
   // 初期化時にトークンをチェック
   useEffect(() => {
+    let isMounted = true; // マウント状態の追跡
+    
     const checkAuth = async () => {
       // 既に認証チェックが進行中の場合は何もしない
       if (authCheckInProgress.current) {
@@ -83,8 +85,8 @@ function AppContent() {
         try {
           const user = await api.getCurrentUser();
           
-          // コンポーネントがアンマウントされていないかチェック
-          if (!abortControllerRef.current?.signal.aborted) {
+          // コンポーネントがマウントされており、リクエストがキャンセルされていないかチェック
+          if (isMounted && !abortControllerRef.current?.signal.aborted) {
             setAuthState({
               user: {
                 id: user.userId,
@@ -97,7 +99,7 @@ function AppContent() {
           }
         } catch (error) {
           // リクエストがキャンセルされた場合は何もしない
-          if (abortControllerRef.current?.signal.aborted) {
+          if (abortControllerRef.current?.signal.aborted || !isMounted) {
             return;
           }
           
@@ -110,11 +112,13 @@ function AppContent() {
           });
         }
       } else {
-        setAuthState({
-          user: null,
-          isAuthenticated: false,
-          isLoading: false
-        });
+        if (isMounted) {
+          setAuthState({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false
+          });
+        }
       }
       
       authCheckInProgress.current = false;
@@ -124,6 +128,7 @@ function AppContent() {
 
     // クリーンアップ関数
     return () => {
+      isMounted = false; // アンマウント時にフラグを無効化
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }

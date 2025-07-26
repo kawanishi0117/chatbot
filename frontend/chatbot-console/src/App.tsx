@@ -38,6 +38,8 @@ function AppContent() {
 
   // 初期化時にトークンをチェック
   useEffect(() => {
+    let isMounted = true; // マウント状態の追跡
+    
     const checkAuth = async () => {
       // 既に認証チェックが進行中の場合は何もしない
       if (authCheckInProgress.current) {
@@ -59,8 +61,8 @@ function AppContent() {
         try {
           const user = await api.getCurrentUser();
           
-          // コンポーネントがアンマウントされていないかチェック
-          if (!abortControllerRef.current?.signal.aborted) {
+          // コンポーネントがマウントされており、リクエストがキャンセルされていないかチェック
+          if (isMounted && !abortControllerRef.current?.signal.aborted) {
             setAuthState({
               user: {
                 id: user.userId,
@@ -76,7 +78,7 @@ function AppContent() {
           }
         } catch (error) {
           // リクエストがキャンセルされた場合は何もしない
-          if (abortControllerRef.current?.signal.aborted) {
+          if (abortControllerRef.current?.signal.aborted || !isMounted) {
             return;
           }
           
@@ -89,11 +91,13 @@ function AppContent() {
           });
         }
       } else {
-        setAuthState({
-          user: null,
-          isAuthenticated: false,
-          isLoading: false
-        });
+        if (isMounted) {
+          setAuthState({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false
+          });
+        }
       }
       
       authCheckInProgress.current = false;
@@ -103,6 +107,7 @@ function AppContent() {
 
     // クリーンアップ関数
     return () => {
+      isMounted = false; // アンマウント時にフラグを無効化
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
@@ -112,34 +117,52 @@ function AppContent() {
 
   // チャットボットデータを取得
   useEffect(() => {
+    let isMounted = true; // マウント状態の追跡
+    let requestInProgress = false; // リクエスト進行状態の追跡
+    
     const fetchBots = async () => {
-      if (authState.isAuthenticated && authState.user) {
+      if (authState.isAuthenticated && authState.user && !requestInProgress) {
+        requestInProgress = true;
         setIsLoadingBots(true);
         try {
           const response = await api.getBots();
-          const botList = response.bots.map(bot => ({
-            id: bot.botId,
-            name: bot.botName,
-            description: bot.description,
-            githubRepo: '',  // これらは別途管理
-            s3Folder: '',
-            isActive: bot.isActive,
-            createdAt: new Date(bot.createdAt).toISOString(),
-            updatedAt: new Date(bot.updatedAt).toISOString()
-          }));
-          setChatbots(botList);
-          if (botList.length > 0) {
-            setSelectedChatbot(botList[0]);
+          
+          // コンポーネントがマウントされているかチェック
+          if (isMounted) {
+            const botList = response.bots.map(bot => ({
+              id: bot.botId,
+              name: bot.botName,
+              description: bot.description,
+              githubRepo: '',  // これらは別途管理
+              s3Folder: '',
+              isActive: bot.isActive,
+              createdAt: new Date(bot.createdAt).toISOString(),
+              updatedAt: new Date(bot.updatedAt).toISOString()
+            }));
+            setChatbots(botList);
+            if (botList.length > 0) {
+              setSelectedChatbot(botList[0]);
+            }
           }
         } catch (error) {
-          console.error('Failed to fetch bots:', error);
+          if (isMounted) {
+            console.error('Failed to fetch bots:', error);
+          }
         } finally {
-          setIsLoadingBots(false);
+          if (isMounted) {
+            setIsLoadingBots(false);
+          }
+          requestInProgress = false;
         }
       }
     };
     
     fetchBots();
+    
+    // クリーンアップ関数
+    return () => {
+      isMounted = false;
+    };
   }, [authState.isAuthenticated, authState.user]);
 
   const handleLogin = async (_email: string, _password: string) => {
