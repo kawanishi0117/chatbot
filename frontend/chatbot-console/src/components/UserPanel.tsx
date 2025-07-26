@@ -120,13 +120,13 @@ const UserPanel: React.FC<UserPanelProps> = ({ chatbot, onSave }) => {
   const handleInviteUser = (e: React.FormEvent) => {
     e.preventDefault();
     // デモ用の招待処理
-    console.log('User invited');
+          // ユーザーを招待
     setIsInviting(false);
   };
 
   const handleViewUser = (user: User) => {
     // デモ用のユーザー詳細表示
-    console.log('View user:', user);
+          // ユーザー詳細表示
   };
 
   const formatDate = (dateString: string) => {

@@ -26,7 +26,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onToggleSidebar, isSide
 
   const handlePasswordSuccess = () => {
     // パスワード変更成功時の処理（必要に応じて）
-    console.log('パスワードが正常に変更されました');
+            // パスワード変更完了
   };
 
   // メニュー外クリックで閉じる

@@ -1,16 +1,15 @@
 import {
-    Activity,
-    ArrowLeft,
-    Bot,
-    Database,
-    Github,
-    Plus,
-    Shield,
-    Users,
-    Webhook
+	Activity,
+	ArrowLeft,
+	Bot,
+	Database,
+	Github,
+	Plus,
+	Shield,
+	Users,
+	Webhook
 } from 'lucide-react';
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { ChatbotConfig } from '../types';
 
 interface SidebarProps {
@@ -32,8 +31,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentView,
   onViewChange
 }) => {
-  const navigate = useNavigate();
-  
   const menuItems = selectedChatbot ? [
     { id: 'overview', label: '概要', icon: Activity },
     { id: 'github', label: 'GitHub設定', icon: Github },
@@ -48,17 +45,17 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* モバイル用オーバーレイ */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-gray-600 bg-opacity-50 z-20 lg:hidden"
+          className="fixed inset-0 bg-gray-600 bg-opacity-50 z-40 lg:hidden"
           onClick={() => onSelectChatbot(null)}
         />
       )}
 
       {/* サイドバー */}
       <div className={`
-        fixed top-0 left-0 h-full w-80 bg-white border-r border-gray-200 z-30
+        fixed top-0 left-0 h-full w-80 bg-white border-r border-gray-200 z-40
         transform transition-transform duration-200 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:translate-x-0 lg:static lg:z-10
+        lg:translate-x-0 lg:static lg:h-full
       `}>
         <div className="flex flex-col h-full">
           {/* ヘッダー部分 */}
@@ -104,7 +101,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           {/* メニュー部分 */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto scrollbar-thin p-4">
             {selectedChatbot ? (
               <nav className="space-y-1">
                 {menuItems.map((item) => {
@@ -150,15 +147,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                           key={chatbot.id}
                           onClick={() => {
                             onSelectChatbot(chatbot);
-                            navigate('/overview');
                           }}
-                          className={`
-                            w-full text-left p-3 rounded-lg transition-all
-                            ${selectedChatbot?.id === chatbot.id
-                              ? 'bg-blue-50 border-2 border-blue-200 text-blue-900'
-                              : 'bg-gray-50 border-2 border-transparent text-gray-700 hover:bg-gray-100'
-                            }
-                          `}
+                                                     className="w-full text-left p-3 rounded-lg transition-all bg-gray-50 border-2 border-transparent text-gray-700 hover:bg-gray-100"
                         >
                           <div className="flex items-center space-x-3">
                             <div className={`

@@ -26,7 +26,7 @@ const botSettingsAPI = {
       if (response.ok) {
         // バックエンドレスポンス構造: { data: { bots: [...], count: number } }
         const bots = data.data?.bots || data.bots || [];
-        console.log('API Response:', data, 'Extracted bots:', bots);
+        // API応答からボット一覧を取得
         return { success: true, data: Array.isArray(bots) ? bots : [] };
       } else {
         return { success: false, error: data.message || 'ボット一覧の取得に失敗しました' };
@@ -67,7 +67,7 @@ const botSettingsAPI = {
       const result = await response.json();
       
       if (response.ok) {
-        console.log('Create Bot Response:', result);
+        // ボット作成完了
         return { success: true, data: result.data || result };
       } else {
         return { success: false, error: result.message || 'ボットの作成に失敗しました' };
@@ -147,7 +147,7 @@ const BotSettingsPanel: React.FC<BotSettingsPanelProps> = ({ currentUserId }) =>
       
       if (result.success && result.data) {
         const botsArray = Array.isArray(result.data) ? result.data : [];
-        console.log('Fetched bots:', botsArray);
+        // ボット一覧を取得完了
         setBots(botsArray);
       } else {
         console.error('Fetch bots failed:', result.error);

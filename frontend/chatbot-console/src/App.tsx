@@ -38,15 +38,15 @@ function AppContent() {
   // Get current view from URL path
   const getCurrentView = () => {
     const path = location.pathname;
-    if (path === '/' || path === '/overview') return 'overview';
-    if (path === '/bots') return 'bots';
-    if (path === '/github') return 'github';
-    if (path === '/s3') return 's3';
-    if (path === '/webhooks') return 'webhooks';
-    if (path === '/users') return 'users';
-    if (path === '/security') return 'security';
+    if (path === '/' || path === '/bots') return 'bots';
+    if (path.includes('/overview')) return 'overview';
+    if (path.includes('/github')) return 'github';
+    if (path.includes('/s3')) return 's3';
+    if (path.includes('/webhooks')) return 'webhooks';
+    if (path.includes('/users')) return 'users';
+    if (path.includes('/security')) return 'security';
     if (path === '/create') return 'create';
-    return 'overview';
+    return 'bots';
   };
 
   // 初期化時にトークンをチェック
@@ -174,7 +174,7 @@ function AppContent() {
   const handleSelectChatbot = (chatbot: ChatbotConfig | null) => {
     setSelectedChatbot(chatbot);
     if (chatbot) {
-      navigate('/overview');
+      navigate(`/bots/${chatbot.id}/overview`);
     } else {
       navigate('/bots');
     }
@@ -215,7 +215,7 @@ function AppContent() {
         
         setChatbots(prev => [newBot, ...prev]);
         setSelectedChatbot(newBot);
-        navigate('/overview');
+        navigate(`/bots/${response.botId}/overview`);
         setIsCreatingBot(false);
       }
     } catch (error) {
@@ -254,6 +254,92 @@ function AppContent() {
     handleUpdateChatbot({ s3Folder });
   };
 
+  // ボット詳細ページ用のコンポーネント
+  const BotDetailRoute = ({ view }: { view: string }) => {
+    const { botId } = useParams<{ botId: string }>();
+    
+    // URLのボットIDに基づいてselectedChatbotを設定
+    useEffect(() => {
+      if (botId && chatbots.length > 0) {
+        const bot = chatbots.find(b => b.id === botId);
+        if (bot && (!selectedChatbot || selectedChatbot.id !== botId)) {
+          setSelectedChatbot(bot);
+        } else if (!bot) {
+          // ボットが見つからない場合はボット一覧に戻る
+          navigate('/bots');
+        }
+      }
+    }, [botId, chatbots, selectedChatbot, navigate]);
+
+    if (!botId || !selectedChatbot || selectedChatbot.id !== botId) {
+      return <Navigate to="/bots" replace />;
+    }
+
+    switch (view) {
+      case 'overview':
+        return (
+          <div className="h-full">
+            <OverviewPanel
+              chatbot={selectedChatbot}
+              onEdit={() => navigate(`/bots/${botId}/github`)}
+              onToggleStatus={handleToggleChatbotStatus}
+            />
+          </div>
+        );
+      case 'github':
+        return (
+          <div className="h-full">
+            <GitHubPanel
+              chatbot={selectedChatbot}
+              onSave={handleSaveGitHubRepo}
+            />
+          </div>
+        );
+      case 's3':
+        return (
+          <div className="h-full">
+            <S3Panel
+              chatbot={selectedChatbot}
+              onSave={handleSaveS3Folder}
+            />
+          </div>
+        );
+      case 'webhooks':
+        return (
+          <div className="h-full">
+            <WebhookPanel
+              chatbot={selectedChatbot}
+              onSave={(webhooks) => {
+            // TODO: Webhook保存の実装
+          }}
+            />
+          </div>
+        );
+      case 'users':
+        return (
+          <div className="h-full">
+            <UserPanel
+              chatbot={selectedChatbot}
+              onSave={(userAccess) => {
+            // TODO: ユーザーアクセス保存の実装
+          }}
+            />
+          </div>
+        );
+      case 'security':
+        return (
+          <div className="h-full p-6">
+            <div className="text-center text-gray-500">
+              <h2 className="text-xl font-semibold mb-2">セキュリティ設定</h2>
+              <p>このパネルは開発中です</p>
+            </div>
+          </div>
+        );
+      default:
+        return <Navigate to={`/bots/${botId}/overview`} replace />;
+    }
+  };
+
   // Route Components
   const CreateBotRoute = () => (
     <div className="h-full">
@@ -282,7 +368,7 @@ function AppContent() {
             const chatbot = chatbots.find(c => c.id === bot.botId);
             if (chatbot) {
               setSelectedChatbot(chatbot);
-              navigate('/overview');
+              navigate(`/bots/${bot.botId}/overview`);
             }
           }}
           onDelete={async (bot) => {
@@ -346,90 +432,7 @@ function AppContent() {
     </div>
   );
 
-  const OverviewRoute = () => {
-    if (!selectedChatbot) {
-      return <Navigate to="/bots" replace />;
-    }
-    return (
-      <div className="h-full">
-        <OverviewPanel
-          chatbot={selectedChatbot}
-          onEdit={() => navigate('/github')}
-          onToggleStatus={handleToggleChatbotStatus}
-        />
-      </div>
-    );
-  };
-
-  const GitHubRoute = () => {
-    if (!selectedChatbot) {
-      return <Navigate to="/bots" replace />;
-    }
-    return (
-      <div className="h-full">
-        <GitHubPanel
-          chatbot={selectedChatbot}
-          onSave={handleSaveGitHubRepo}
-        />
-      </div>
-    );
-  };
-
-  const S3Route = () => {
-    if (!selectedChatbot) {
-      return <Navigate to="/bots" replace />;
-    }
-    return (
-      <div className="h-full">
-        <S3Panel
-          chatbot={selectedChatbot}
-          onSave={handleSaveS3Folder}
-        />
-      </div>
-    );
-  };
-
-  const WebhooksRoute = () => {
-    if (!selectedChatbot) {
-      return <Navigate to="/bots" replace />;
-    }
-    return (
-      <div className="h-full">
-        <WebhookPanel
-          chatbot={selectedChatbot}
-          onSave={(webhooks) => console.log('Webhooks saved:', webhooks)}
-        />
-      </div>
-    );
-  };
-
-  const UsersRoute = () => {
-    if (!selectedChatbot) {
-      return <Navigate to="/bots" replace />;
-    }
-    return (
-      <div className="h-full">
-        <UserPanel
-          chatbot={selectedChatbot}
-          onSave={(userAccess) => console.log('User access saved:', userAccess)}
-        />
-      </div>
-    );
-  };
-
-  const SecurityRoute = () => {
-    if (!selectedChatbot) {
-      return <Navigate to="/bots" replace />;
-    }
-    return (
-      <div className="h-full p-6">
-        <div className="text-center text-gray-500">
-          <h2 className="text-xl font-semibold mb-2">セキュリティ設定</h2>
-          <p>このパネルは開発中です</p>
-        </div>
-      </div>
-    );
-  };
+  // 以下の個別のRoute Componentは削除 (BotDetailRouteに統合)
 
   if (authState.isLoading) {
     return (
@@ -461,21 +464,34 @@ function AppContent() {
           onSelectChatbot={handleSelectChatbot}
           onCreateChatbot={handleCreateChatbot}
           currentView={getCurrentView()}
-          onViewChange={(view) => navigate(`/${view}`)}
+          onViewChange={(view) => {
+            if (selectedChatbot && view !== 'bots' && view !== 'create') {
+              navigate(`/bots/${selectedChatbot.id}/${view}`);
+            } else {
+              navigate(`/${view}`);
+            }
+          }}
         />
         
-        <main className="flex-1">
+        <main className="flex-1 flex flex-col overflow-hidden">
           <div className="h-full overflow-y-auto scrollbar-thin">
             <Routes>
               <Route path="/" element={<Navigate to="/bots" replace />} />
               <Route path="/bots" element={<BotsRoute />} />
               <Route path="/create" element={<CreateBotRoute />} />
-              <Route path="/overview" element={<OverviewRoute />} />
-              <Route path="/github" element={<GitHubRoute />} />
-              <Route path="/s3" element={<S3Route />} />
-              <Route path="/webhooks" element={<WebhooksRoute />} />
-              <Route path="/users" element={<UsersRoute />} />
-              <Route path="/security" element={<SecurityRoute />} />
+              <Route path="/bots/:botId/overview" element={<BotDetailRoute view="overview" />} />
+              <Route path="/bots/:botId/github" element={<BotDetailRoute view="github" />} />
+              <Route path="/bots/:botId/s3" element={<BotDetailRoute view="s3" />} />
+              <Route path="/bots/:botId/webhooks" element={<BotDetailRoute view="webhooks" />} />
+              <Route path="/bots/:botId/users" element={<BotDetailRoute view="users" />} />
+              <Route path="/bots/:botId/security" element={<BotDetailRoute view="security" />} />
+              {/* 旧ルートからの互換性のためのリダイレクト */}
+              <Route path="/overview" element={<Navigate to="/bots" replace />} />
+              <Route path="/github" element={<Navigate to="/bots" replace />} />
+              <Route path="/s3" element={<Navigate to="/bots" replace />} />
+              <Route path="/webhooks" element={<Navigate to="/bots" replace />} />
+              <Route path="/users" element={<Navigate to="/bots" replace />} />
+              <Route path="/security" element={<Navigate to="/bots" replace />} />
             </Routes>
           </div>
         </main>
