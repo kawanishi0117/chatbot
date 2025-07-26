@@ -71,6 +71,26 @@ Resources:
           Properties:
             Path: /api/auth/login
             Method: POST
+        AuthMeAPI:
+          Type: Api
+          Properties:
+            Path: /api/auth/me
+            Method: ANY
+        AuthLogoutAPI:
+          Type: Api
+          Properties:
+            Path: /api/auth/logout
+            Method: POST
+        ChatsAPI:
+          Type: Api
+          Properties:
+            Path: /api/chats
+            Method: ANY
+        ChatsDetailAPI:
+          Type: Api
+          Properties:
+            Path: /api/chats/{chatId}
+            Method: ANY
         AuthCurrentUserAPI:
           Type: Api
           Properties:

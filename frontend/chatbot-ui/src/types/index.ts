@@ -11,6 +11,7 @@ export interface Chat {
   messages: Message[];
   createdAt: Date;
   updatedAt: Date;
+  botId?: string; // チャットで使用されるボットID
 }
 
 export interface User {

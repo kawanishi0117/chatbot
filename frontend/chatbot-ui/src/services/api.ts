@@ -67,7 +67,34 @@ class ApiClient {
     }).then(async (response) => {
       if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-        throw new Error(error.message || `HTTP error! status: ${response.status}`);
+        
+        // HTTPステータスコードに基づいてエラーメッセージを詳細化
+        let errorMessage = error.message || `HTTP error! status: ${response.status}`;
+        
+        switch (response.status) {
+          case 401:
+            errorMessage = '認証が必要です。再度ログインしてください。';
+            // 認証エラーの場合はトークンを削除
+            removeToken();
+            break;
+          case 403:
+            errorMessage = 'アクセス権限がありません。';
+            break;
+          case 404:
+            errorMessage = '指定されたリソースが見つかりません。';
+            break;
+          case 500:
+            errorMessage = 'サーバーエラーが発生しました。しばらく後にお試しください。';
+            break;
+          default:
+            // その他のエラーはレスポンスメッセージを使用
+            break;
+        }
+        
+        const customError = new Error(errorMessage);
+        (customError as any).status = response.status;
+        (customError as any).originalMessage = error.message;
+        throw customError;
       }
       return response.json();
     }).finally(() => {
@@ -192,6 +219,81 @@ class ApiClient {
           timestamp: new Date().toISOString(),
         },
       }),
+    });
+    return response;
+  }
+
+  // チャットルーム管理API
+  async createChatRoom(botId: string, title?: string) {
+    const response = await this.request<{
+      chatId: string;
+      title: string;
+      botId: string;
+      botName: string;
+      createdAt: number;
+    }>('/api/chats', {
+      method: 'POST',
+      body: JSON.stringify({
+        botId,
+        title: title || '新しいチャット',
+      }),
+    });
+    return response;
+  }
+
+  async getUserChats() {
+    const response = await this.request<{
+      chats: Array<{
+        chatId: string;
+        title: string;
+        botId: string;
+        botName: string;
+        createdAt: number;
+        updatedAt: number;
+        messageCount: number;
+        lastMessage: string;
+      }>;
+      count: number;
+    }>('/api/chats', {
+      method: 'GET',
+    });
+    return response;
+  }
+
+  async getChatRoom(chatId: string) {
+    const response = await this.request<{
+      chatId: string;
+      title: string;
+      botId: string;
+      botName: string;
+      createdAt: number;
+      updatedAt: number;
+      messageCount: number;
+      lastMessage: string;
+    }>(`/api/chats/${chatId}`, {
+      method: 'GET',
+    });
+    return response;
+  }
+
+  // チャットルームの存在確認
+  async checkChatExists(chatId: string): Promise<boolean> {
+    try {
+      await this.getChatRoom(chatId);
+      return true;
+    } catch (error: any) {
+      if (error.status === 404) {
+        return false;
+      }
+      throw error; // その他のエラーは再スロー
+    }
+  }
+
+  async deleteChatRoom(chatId: string) {
+    const response = await this.request<{
+      message: string;
+    }>(`/api/chats/${chatId}`, {
+      method: 'DELETE',
     });
     return response;
   }

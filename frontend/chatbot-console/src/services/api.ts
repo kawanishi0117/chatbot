@@ -67,7 +67,34 @@ class ApiClient {
     }).then(async (response) => {
       if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-        throw new Error(error.message || `HTTP error! status: ${response.status}`);
+        
+        // HTTPステータスコードに基づいてエラーメッセージを詳細化
+        let errorMessage = error.message || `HTTP error! status: ${response.status}`;
+        
+        switch (response.status) {
+          case 401:
+            errorMessage = '認証が必要です。再度ログインしてください。';
+            // 認証エラーの場合はトークンを削除
+            removeToken();
+            break;
+          case 403:
+            errorMessage = 'アクセス権限がありません。';
+            break;
+          case 404:
+            errorMessage = '指定されたリソースが見つかりません。';
+            break;
+          case 500:
+            errorMessage = 'サーバーエラーが発生しました。しばらく後にお試しください。';
+            break;
+          default:
+            // その他のエラーはレスポンスメッセージを使用
+            break;
+        }
+        
+        const customError = new Error(errorMessage);
+        (customError as any).status = response.status;
+        (customError as any).originalMessage = error.message;
+        throw customError;
       }
       return response.json();
     }).finally(() => {
@@ -267,8 +294,25 @@ class ApiClient {
       });
       return true; // アクセス権限があればユーザー一覧を取得できる
     } catch (error: any) {
-      if (error.message && (error.message.includes('Forbidden') || error.message.includes('403'))) {
+      if (error.status === 403) {
         return false; // アクセス権限なし
+      }
+      if (error.status === 404) {
+        // ボットが存在しない場合
+        throw new Error('指定されたボットが見つかりません。');
+      }
+      throw error; // その他のエラーは再スロー
+    }
+  }
+
+  // ボットの存在確認
+  async checkBotExists(botId: string): Promise<boolean> {
+    try {
+      await this.getBot(botId);
+      return true;
+    } catch (error: any) {
+      if (error.status === 404) {
+        return false;
       }
       throw error; // その他のエラーは再スロー
     }

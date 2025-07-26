@@ -12,6 +12,7 @@ import os
 import time
 import uuid
 from typing import Any, Dict, Optional, BinaryIO, Union
+from boto3.dynamodb.conditions import Key, Attr
 
 # 新しい共通モジュールのインポート
 try:
@@ -30,6 +31,9 @@ s3_client = boto3.client("s3")
 # 環境変数から設定を取得
 CHAT_HISTORY_TABLE = os.environ.get("CHAT_HISTORY_TABLE", "ChatHistory")
 CHAT_ASSETS_BUCKET = os.environ.get("CHAT_ASSETS_BUCKET", "chat-assets-prod")
+CHATBOT_SETTINGS_TABLE = os.environ.get(
+    "CHATBOT_SETTINGS_TABLE", "ChatbotSettingsDB-dev"
+)
 TTL_SECONDS = int(os.environ.get("TTL_SECONDS", 86400))  # 24時間
 
 
@@ -242,3 +246,152 @@ def process_binary_data(
     except Exception as e:
         logger.error("Error processing binary data: %s", str(e))
         return message
+
+
+class DynamoDBManager:
+    """DynamoDB操作を管理するクラス"""
+
+    def __init__(self):
+        self.dynamodb = boto3.resource("dynamodb")
+        self.settings_table = self.dynamodb.Table(CHATBOT_SETTINGS_TABLE)
+        self.chat_table = self.dynamodb.Table(CHAT_HISTORY_TABLE)
+
+    def get_bot_settings(self, bot_id: str) -> Dict[str, Any]:
+        """ボット設定を取得
+
+        Args:
+            bot_id: ボットID
+
+        Returns:
+            dict: ボット設定データまたはエラー情報
+        """
+        try:
+            response = self.settings_table.get_item(
+                Key={"PK": f"BOT#{bot_id}", "SK": "SETTINGS"}
+            )
+
+            if "Item" in response:
+                return {"found": True, "data": response["Item"]}
+            else:
+                return {"found": False, "data": None}
+
+        except Exception as e:
+            logger.error(f"Error getting bot settings: {str(e)}")
+            return {"found": False, "error": str(e)}
+
+    def save_chat_room(self, chat_data: Dict[str, Any]) -> Dict[str, Any]:
+        """チャットルームを保存
+
+        Args:
+            chat_data: チャットルームデータ
+
+        Returns:
+            dict: 保存結果
+        """
+        try:
+            chat_id = chat_data["chatId"]
+            user_id = chat_data["userId"]
+
+            # チャットルーム情報をChatbotSettingsDBに保存
+            item = {
+                "PK": f"USER#{user_id}",
+                "SK": f"CHAT#{chat_id}",
+                "chatId": chat_id,
+                "title": chat_data.get("title", "新しいチャット"),
+                "botId": chat_data["botId"],
+                "botName": chat_data.get("botName", "Unknown Bot"),
+                "createdAt": chat_data["createdAt"],
+                "updatedAt": chat_data["updatedAt"],
+                "messageCount": chat_data.get("messageCount", 0),
+                "lastMessage": chat_data.get("lastMessage", ""),
+                "isActive": chat_data.get("isActive", True),
+            }
+
+            self.settings_table.put_item(Item=item)
+
+            return {"success": True, "chatId": chat_id}
+
+        except Exception as e:
+            logger.error(f"Error saving chat room: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    def get_user_chats(self, user_id: str) -> Dict[str, Any]:
+        """ユーザーのチャット一覧を取得
+
+        Args:
+            user_id: ユーザーID
+
+        Returns:
+            dict: チャット一覧データ
+        """
+        try:
+            response = self.settings_table.query(
+                KeyConditionExpression=Key("PK").eq(f"USER#{user_id}")
+                & Key("SK").begins_with("CHAT#"),
+                ScanIndexForward=False,  # 新しい順にソート
+            )
+
+            chats = response.get("Items", [])
+
+            return {"success": True, "data": chats}
+
+        except Exception as e:
+            logger.error(f"Error getting user chats: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    def get_chat_room(self, chat_id: str) -> Dict[str, Any]:
+        """チャットルーム詳細を取得
+
+        Args:
+            chat_id: チャットID
+
+        Returns:
+            dict: チャットルームデータ
+        """
+        try:
+            # GSIを使用してchatIdから検索
+            response = self.settings_table.scan(
+                FilterExpression=Attr("chatId").eq(chat_id)
+            )
+
+            items = response.get("Items", [])
+            if items:
+                return {"found": True, "data": items[0]}
+            else:
+                return {"found": False, "data": None}
+
+        except Exception as e:
+            logger.error(f"Error getting chat room: {str(e)}")
+            return {"found": False, "error": str(e)}
+
+    def delete_chat_room(self, chat_id: str) -> Dict[str, Any]:
+        """チャットルームを削除
+
+        Args:
+            chat_id: チャットID
+
+        Returns:
+            dict: 削除結果
+        """
+        try:
+            # まずチャットルームを検索
+            chat_result = self.get_chat_room(chat_id)
+            if not chat_result["found"]:
+                return {"success": False, "error": "Chat room not found"}
+
+            chat_data = chat_result["data"]
+            user_id = chat_data.get("userId")
+
+            if not user_id:
+                return {"success": False, "error": "Invalid chat room data"}
+
+            # チャットルームレコードを削除
+            self.settings_table.delete_item(
+                Key={"PK": f"USER#{user_id}", "SK": f"CHAT#{chat_id}"}
+            )
+
+            return {"success": True}
+
+        except Exception as e:
+            logger.error(f"Error deleting chat room: {str(e)}")
+            return {"success": False, "error": str(e)}

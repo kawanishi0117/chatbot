@@ -237,18 +237,44 @@ function MainApp() {
   };
 
   // 新しいチャット作成
-  const handleCreateChat = () => {
-    const newChat: Chat = {
-      id: Date.now().toString(),
-      title: '新しいチャット',
-      messages: [],
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    
-    setChats(prev => [newChat, ...prev]);
-    navigate(`/chat/${newChat.id}`);
-    setIsSidebarOpen(false);
+  const handleCreateChat = async () => {
+    if (!selectedBotId) {
+      console.error('ボットが選択されていません');
+      return;
+    }
+
+    try {
+      // バックエンドAPIでチャットルームを作成
+      const response = await api.createChatRoom(selectedBotId, '新しいチャット');
+      
+      const newChat: Chat = {
+        id: response.chatId,
+        title: response.title,
+        messages: [],
+        createdAt: new Date(response.createdAt * 1000),
+        updatedAt: new Date(response.createdAt * 1000),
+        botId: response.botId
+      };
+      
+      setChats(prev => [newChat, ...prev]);
+      navigate(`/chat/${newChat.id}`);
+      setIsSidebarOpen(false);
+    } catch (error) {
+      console.error('チャットルームの作成に失敗しました:', error);
+      // エラー時はローカルでチャットを作成（フォールバック）
+      const newChat: Chat = {
+        id: Date.now().toString(),
+        title: '新しいチャット',
+        messages: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        botId: selectedBotId
+      };
+      
+      setChats(prev => [newChat, ...prev]);
+      navigate(`/chat/${newChat.id}`);
+      setIsSidebarOpen(false);
+    }
   };
 
   // チャット選択
@@ -263,6 +289,24 @@ function MainApp() {
     if (currentChatId === deleteChatId) {
       navigate('/');
     }
+  };
+
+  // 存在しないチャットIDの処理
+  const handleInvalidChatId = (chatId: string) => {
+    console.warn(`存在しないチャットID: ${chatId}`);
+    navigate('/');
+  };
+
+  // 認証エラー処理
+  const handleAuthError = () => {
+    console.warn('認証エラーが発生しました。ログアウトします。');
+    setAuthState({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false
+    });
+    setChats([]);
+    navigate('/');
   };
 
   // メッセージ送信
@@ -313,7 +357,11 @@ function MainApp() {
     setIsSendingMessage(true);
 
     try {
-      // 実際のAPI呼び出し
+      // チャットのボットIDを取得
+      const targetChat = chats.find(chat => chat.id === targetChatId);
+      const botId = targetChat?.botId || selectedBotId;
+
+      // 実際のAPI呼び出し（ボットIDを含む）
       const response = await api.sendMessage(content, targetChatId);
       
       // AI応答をチャットに追加
@@ -333,9 +381,23 @@ function MainApp() {
             }
           : chat
       ));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to send message:', error);
-      // エラー時はデモ応答を使用
+      
+      // 認証エラーの場合はログアウト
+      if (error.status === 401) {
+        handleAuthError();
+        return;
+      }
+      
+      // 404エラー（チャットが存在しない）の場合はトップページにリダイレクト
+      if (error.status === 404) {
+        console.warn(`チャットが存在しません: ${targetChatId}`);
+        handleInvalidChatId(targetChatId);
+        return;
+      }
+      
+      // その他のエラーの場合はデモ応答を使用
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: generateAIResponse(content),
@@ -361,6 +423,64 @@ function MainApp() {
   // チャット詳細ページ用のコンポーネント
   const ChatRoute = () => {
     const chat = currentChat;
+    const [isValidating, setIsValidating] = useState(false);
+
+    // 存在しないチャットIDの場合はトップページにリダイレクト
+    useEffect(() => {
+      const validateChatId = async () => {
+        if (!currentChatId) return;
+        
+        // ローカルのチャット一覧に存在するかチェック
+        if (chats.length > 0 && !chat) {
+          // チャット一覧が読み込まれているのに該当チャットが見つからない場合
+          setIsValidating(true);
+          try {
+            // APIでチャットの存在確認
+            const exists = await api.checkChatExists(currentChatId);
+            if (!exists) {
+              handleInvalidChatId(currentChatId);
+              return;
+            }
+            // チャットが存在する場合は情報を取得
+            const chatInfo = await api.getChatRoom(currentChatId);
+            const newChat: Chat = {
+              id: chatInfo.chatId,
+              title: chatInfo.title,
+              messages: [], // メッセージは別途取得
+              createdAt: new Date(chatInfo.createdAt * 1000),
+              updatedAt: new Date(chatInfo.updatedAt * 1000),
+              botId: chatInfo.botId
+            };
+            setChats(prev => [newChat, ...prev.filter(c => c.id !== currentChatId)]);
+          } catch (error: any) {
+            console.error('チャット存在確認エラー:', error);
+            if (error.status === 401) {
+              handleAuthError();
+            } else if (error.status === 404) {
+              handleInvalidChatId(currentChatId);
+            }
+          } finally {
+            setIsValidating(false);
+          }
+        }
+      };
+
+      validateChatId();
+    }, [currentChatId, chat, chats.length]); // chats.lengthに変更してループを防止
+
+    // チャット存在確認中の表示
+    if (isValidating) {
+      return (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">チャットを確認中...</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -368,6 +488,8 @@ function MainApp() {
           currentChat={chat}
           onSendMessage={handleSendMessage}
           isTyping={isTyping}
+          selectedBotId={selectedBotId}
+          bots={bots}
         />
       </div>
     );
@@ -381,9 +503,21 @@ function MainApp() {
           currentChat={null}
           onSendMessage={handleSendMessage}
           isTyping={isTyping}
+          selectedBotId={selectedBotId}
+          bots={bots}
         />
       </div>
     );
+  };
+
+  // 404エラーページ用のコンポーネント
+  const NotFoundRoute = () => {
+    useEffect(() => {
+      // 存在しないパスにアクセスした場合はトップページにリダイレクト
+      navigate('/', { replace: true });
+    }, [navigate]);
+
+    return null;
   };
 
   if (authState.isLoading) {
@@ -453,9 +587,10 @@ function App() {
   return (
     <AlertProvider>
       <Routes>
-
         <Route path="/" element={<MainApp />} />
         <Route path="/chat/:chatId" element={<MainApp />} />
+        {/* 存在しないパスは全てトップページにリダイレクト */}
+        <Route path="*" element={<MainApp />} />
       </Routes>
     </AlertProvider>
   );

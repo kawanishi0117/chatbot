@@ -271,6 +271,19 @@ function AppContent() {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
+  // 認証エラー処理
+  const handleAuthError = () => {
+    console.warn('認証エラーが発生しました。ログアウトします。');
+    setAuthState({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false
+    });
+    setChatbots([]);
+    setSelectedChatbot(null);
+    navigate('/bots');
+  };
+
   // 新しいチャットボット作成
   const handleCreateChatbot = () => {
     navigate('/create');
@@ -349,7 +362,11 @@ function AppContent() {
     // ボットアクセス権限をチェック
     useEffect(() => {
       const checkAccess = async () => {
-        if (!botId) return;
+        if (!botId) {
+          // ボットIDが存在しない場合はトップページにリダイレクト
+          navigate('/bots', { replace: true });
+          return;
+        }
         
         setIsCheckingAccess(true);
         try {
@@ -358,20 +375,44 @@ function AppContent() {
           
           if (!accessCheck) {
             showAlert('このボットへのアクセス権限がありません', 'error');
-            navigate('/bots');
+            navigate('/bots', { replace: true });
             return;
           }
           
           // アクセス権限がある場合、ボット一覧からボット情報を取得
           if (chatbots.length > 0) {
             const bot = chatbots.find(b => b.id === botId);
-            if (bot && (!selectedChatbot || selectedChatbot.id !== botId)) {
+            if (!bot) {
+              // ボットが見つからない場合はトップページにリダイレクト
+              showAlert('指定されたボットが見つかりません', 'error');
+              navigate('/bots', { replace: true });
+              return;
+            }
+            if (!selectedChatbot || selectedChatbot.id !== botId) {
               setSelectedChatbot(bot);
             }
           }
         } catch (error: any) {
-          showAlert('アクセス権限の確認に失敗しました: ' + (error.message || 'Unknown error'), 'error');
-          navigate('/bots');
+          console.error('Access check failed:', error);
+          
+          // 認証エラーの場合はログアウト
+          if (error.status === 401) {
+            handleAuthError();
+            return;
+          }
+          
+          // 404エラーや存在しないボットの場合
+          if (error.message && (
+            error.message.includes('404') || 
+            error.message.includes('Not Found') ||
+            error.message.includes('not found') ||
+            error.message.includes('does not exist')
+          )) {
+            showAlert('指定されたボットが見つかりません', 'error');
+          } else {
+            showAlert('アクセス権限の確認に失敗しました: ' + (error.message || 'Unknown error'), 'error');
+          }
+          navigate('/bots', { replace: true });
         } finally {
           setIsCheckingAccess(false);
         }
@@ -380,7 +421,7 @@ function AppContent() {
       if (botId) {
         checkAccess();
       }
-    }, [botId, chatbots, selectedChatbot, navigate, showAlert]);
+    }, [botId, chatbots.length, selectedChatbot?.id, navigate, showAlert]); // 依存配列を最適化
 
     // アクセス権限チェック中の表示
     if (isCheckingAccess || hasAccess === null) {
@@ -650,6 +691,8 @@ function AppContent() {
               <Route path="/webhooks" element={<Navigate to="/bots" replace />} />
               <Route path="/users" element={<Navigate to="/bots" replace />} />
               <Route path="/security" element={<Navigate to="/bots" replace />} />
+              {/* 存在しないパスは全てトップページ（/bots）にリダイレクト */}
+              <Route path="*" element={<Navigate to="/bots" replace />} />
             </Routes>
           </div>
         </main>

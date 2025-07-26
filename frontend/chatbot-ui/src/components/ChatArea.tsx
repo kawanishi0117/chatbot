@@ -8,9 +8,22 @@ interface ChatAreaProps {
   currentChat: Chat | null;
   onSendMessage: (message: string) => void;
   isTyping: boolean;
+  selectedBotId?: string | null;
+  bots?: Array<{
+    botId: string;
+    botName: string;
+    description: string;
+    isActive: boolean;
+  }>;
 }
 
-const ChatArea: React.FC<ChatAreaProps> = ({ currentChat, onSendMessage, isTyping }) => {
+const ChatArea: React.FC<ChatAreaProps> = ({ 
+  currentChat, 
+  onSendMessage, 
+  isTyping, 
+  selectedBotId, 
+  bots = [] 
+}) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // 新しいメッセージが来たら自動スクロール
@@ -73,7 +86,13 @@ const ChatArea: React.FC<ChatAreaProps> = ({ currentChat, onSendMessage, isTypin
           </div>
           <div>
             <h2 className="font-semibold text-gray-900">{currentChat.title}</h2>
-            <p className="text-sm text-gray-500">AIアシスタント・オンライン</p>
+            <p className="text-sm text-gray-500">
+              {(() => {
+                const botId = currentChat.botId || selectedBotId;
+                const bot = bots.find(b => b.botId === botId);
+                return bot ? `${bot.botName}・オンライン` : 'AIアシスタント・オンライン';
+              })()}
+            </p>
           </div>
         </div>
       </div>
