@@ -6,7 +6,7 @@ import Header from './components/Header';
 import { LoadingOverlay, LoadingSpinner } from './components/loading';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
-import { AlertProvider } from './contexts/AlertContext';
+import { AlertProvider, useAlert } from './contexts/AlertContext';
 import { api, getToken } from './services/api';
 import { AuthState, Chat, Message } from './types';
 
@@ -44,6 +44,7 @@ const generateAIResponse = (userMessage: string): string => {
 function MainApp() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { showAlert } = useAlert();
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
@@ -261,19 +262,12 @@ function MainApp() {
       setIsSidebarOpen(false);
     } catch (error) {
       console.error('チャットルームの作成に失敗しました:', error);
-      // エラー時はローカルでチャットを作成（フォールバック）
-      const newChat: Chat = {
-        id: Date.now().toString(),
-        title: '新しいチャット',
-        messages: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        botId: selectedBotId
-      };
-      
-      setChats(prev => [newChat, ...prev]);
-      navigate(`/chat/${newChat.id}`);
-      setIsSidebarOpen(false);
+      // エラー時は適切なアラートを表示
+      await showAlert(
+        'チャットルームの作成に失敗しました。しばらく後にお試しください。',
+        'error',
+        'エラー'
+      );
     }
   };
 

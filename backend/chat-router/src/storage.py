@@ -267,7 +267,7 @@ class DynamoDBManager:
         """
         try:
             response = self.settings_table.get_item(
-                Key={"PK": f"BOT#{bot_id}", "SK": "SETTINGS"}
+                Key={"PK": f"BOT#{bot_id}", "SK": "CONFIG"}
             )
 
             if "Item" in response:
