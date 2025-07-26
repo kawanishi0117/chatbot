@@ -8,7 +8,6 @@ interface ChatAreaProps {
   currentChat: Chat | null;
   onSendMessage: (message: string) => void;
   isTyping: boolean;
-  selectedBotId?: string | null;
   bots?: Array<{
     botId: string;
     botName: string;
@@ -21,7 +20,6 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   currentChat, 
   onSendMessage, 
   isTyping, 
-  selectedBotId, 
   bots = [] 
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -88,7 +86,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             <h2 className="font-semibold text-gray-900">{currentChat.title}</h2>
             <p className="text-sm text-gray-500">
               {(() => {
-                const botId = currentChat.botId || selectedBotId;
+                const botId = currentChat.botId;
                 const bot = bots.find(b => b.botId === botId);
                 return bot ? `${bot.botName}・オンライン` : 'AIアシスタント・オンライン';
               })()}

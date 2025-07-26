@@ -325,6 +325,9 @@ class DynamoDBManager:
             dict: チャット一覧データ
         """
         try:
+            logger.info(f"Getting user chats for user_id: {user_id}")
+            logger.info(f"Using table: {CHATBOT_SETTINGS_TABLE}")
+
             response = self.settings_table.query(
                 KeyConditionExpression=Key("PK").eq(f"USER#{user_id}")
                 & Key("SK").begins_with("CHAT#"),
@@ -332,11 +335,16 @@ class DynamoDBManager:
             )
 
             chats = response.get("Items", [])
+            logger.info(f"Found {len(chats)} chats for user {user_id}")
 
             return {"success": True, "data": chats}
 
         except Exception as e:
             logger.error(f"Error getting user chats: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return {"success": False, "error": str(e)}
 
     def get_chat_room(self, chat_id: str) -> Dict[str, Any]:
@@ -394,4 +402,39 @@ class DynamoDBManager:
 
         except Exception as e:
             logger.error(f"Error deleting chat room: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    def get_chat_messages(self, chat_id: str, limit: int = 50) -> Dict[str, Any]:
+        """チャットのメッセージ履歴を取得
+
+        Args:
+            chat_id: チャットID
+            limit: 取得するメッセージの最大数
+
+        Returns:
+            dict: メッセージ履歴データまたはエラー情報
+        """
+        try:
+            # ルームキーを生成（チャットIDベース）
+            room_key = f"CHAT#{chat_id}"
+
+            # メッセージを取得
+            messages = get_recent_messages(room_key, limit)
+
+            # メッセージをAPIレスポンス用に変換
+            formatted_messages = []
+            for msg in messages:
+                # タイムスタンプを解析してMessage形式に変換
+                message_data = {
+                    "id": msg.get("SK", ""),  # ソートキーをIDとして使用
+                    "content": msg.get("text", ""),
+                    "role": msg.get("role", "user"),  # userまたはassistant
+                    "timestamp": msg.get("SK", ""),  # タイムスタンプ
+                }
+                formatted_messages.append(message_data)
+
+            return {"success": True, "data": formatted_messages}
+
+        except Exception as e:
+            logger.error(f"Error getting chat messages: {str(e)}")
             return {"success": False, "error": str(e)}

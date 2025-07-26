@@ -298,6 +298,22 @@ class ApiClient {
     return response;
   }
 
+  async getChatMessages(chatId: string) {
+    const response = await this.request<{
+      chatId: string;
+      messages: Array<{
+        id: string;
+        content: string;
+        role: 'user' | 'assistant';
+        timestamp: string;
+      }>;
+      count: number;
+    }>(`/api/chats/${chatId}/messages`, {
+      method: 'GET',
+    });
+    return response;
+  }
+
 
 }
 

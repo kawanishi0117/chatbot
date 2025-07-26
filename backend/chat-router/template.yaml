@@ -91,6 +91,11 @@ Resources:
           Properties:
             Path: /api/chats/{chatId}
             Method: ANY
+        ChatsMessagesAPI:
+          Type: Api
+          Properties:
+            Path: /api/chats/{chatId}/messages
+            Method: GET
         AuthCurrentUserAPI:
           Type: Api
           Properties:

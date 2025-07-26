@@ -3,6 +3,7 @@ import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import ChatArea from './components/ChatArea';
 import Header from './components/Header';
 
+import BotSelectionModal from './components/BotSelectionModal';
 import { LoadingOverlay, LoadingSpinner } from './components/loading';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
@@ -58,11 +59,16 @@ function MainApp() {
     description: string;
     isActive: boolean;
   }>>([]);
-  const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isUserInfoLoading, setIsUserInfoLoading] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+
+  // 新しいボット選択モーダル関連の状態
+  const [isBotSelectionModalOpen, setIsBotSelectionModalOpen] = useState(false);
+  const [isBotsLoading, setIsBotsLoading] = useState(false);
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const [isLoadingChats, setIsLoadingChats] = useState(false);
 
   // URLから現在のチャットIDを取得
   const getCurrentChatId = (): string | null => {
@@ -88,14 +94,100 @@ function MainApp() {
     }));
   };
 
+  // ボット一覧とチャット一覧を読み込む
+  const loadBotsAndChats = async (isMounted: boolean, signal?: AbortSignal) => {
+    try {
+      setIsLoadingChats(true);
+      
+      // ボット一覧を取得
+      const botsResponse = await api.getBots();
+      if (isMounted && !signal?.aborted) {
+        setBots(botsResponse.bots.filter(bot => bot.isActive));
+      }
+
+      // チャット一覧を取得
+      const chatsResponse = await api.getUserChats();
+      if (isMounted && !signal?.aborted) {
+        const formattedChats: Chat[] = chatsResponse.chats.map(chat => ({
+          id: chat.chatId,
+          title: chat.title,
+          messages: [], // メッセージは後で必要に応じて取得
+          createdAt: new Date(chat.createdAt * 1000),
+          updatedAt: new Date(chat.updatedAt * 1000),
+          botId: chat.botId
+        }));
+        setChats(formattedChats);
+      }
+    } catch (error) {
+      console.error('Failed to load bots and chats:', error);
+    } finally {
+      if (isMounted && !signal?.aborted) {
+        setIsLoadingChats(false);
+      }
+    }
+  };
+
+  // チャットのメッセージ履歴を取得
+  const loadChatMessages = async (chatId: string) => {
+    try {
+      const messagesResponse = await api.getChatMessages(chatId);
+      const formattedMessages: Message[] = messagesResponse.messages.map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        role: msg.role,
+        timestamp: new Date(msg.timestamp)
+      }));
+
+      setChats(prev => prev.map(chat => 
+        chat.id === chatId 
+          ? { ...chat, messages: formattedMessages }
+          : chat
+      ));
+    } catch (error) {
+      console.error('Failed to load chat messages:', error);
+    }
+  };
+
   // サイドバートグル処理
   const handleToggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
-  // ボット選択処理
-  const handleSelectBot = (botId: string) => {
-    setSelectedBotId(botId);
+  // 新しいチャット開始ボタンクリック（ボット選択モーダルを開く）
+  const handleStartNewChat = () => {
+    setIsBotSelectionModalOpen(true);
+  };
+
+  // ボット選択モーダルでのボット選択
+  const handleBotSelection = async (botId: string) => {
+    setIsCreatingChat(true);
+    try {
+      // バックエンドAPIでチャットルームを作成
+      const response = await api.createChatRoom(botId, '新しいチャット');
+      
+      const newChat: Chat = {
+        id: response.chatId,
+        title: response.title,
+        messages: [],
+        createdAt: new Date(response.createdAt * 1000),
+        updatedAt: new Date(response.createdAt * 1000),
+        botId: response.botId
+      };
+      
+      setChats(prev => [newChat, ...prev]);
+      navigate(`/chat/${newChat.id}`);
+      setIsSidebarOpen(false);
+    } catch (error) {
+      console.error('チャットルームの作成に失敗しました:', error);
+      // エラー時は適切なアラートを表示
+      await showAlert(
+        'チャットルームの作成に失敗しました。しばらく後にお試しください。',
+        'error',
+        'エラー'
+      );
+    } finally {
+      setIsCreatingChat(false);
+    }
   };
 
   // 初期化時にトークンをチェック
@@ -135,15 +227,8 @@ function MainApp() {
               isLoading: false
             });
 
-            // ユーザー認証成功後にボット一覧を取得
-            try {
-              const botsResponse = await api.getBots();
-              if (isMounted && !abortControllerRef.current?.signal.aborted) {
-                setBots(botsResponse.bots.filter(bot => bot.isActive));
-              }
-            } catch (error) {
-              console.error('Failed to load bots:', error);
-            }
+            // ユーザー認証成功後にボット一覧とチャット一覧を取得
+            await loadBotsAndChats(isMounted, abortControllerRef.current?.signal)
           }
         } catch (error) {
           // リクエストがキャンセルされた場合は何もしない
@@ -237,44 +322,16 @@ function MainApp() {
     }
   };
 
-  // 新しいチャット作成
-  const handleCreateChat = async () => {
-    if (!selectedBotId) {
-      console.error('ボットが選択されていません');
-      return;
-    }
-
-    try {
-      // バックエンドAPIでチャットルームを作成
-      const response = await api.createChatRoom(selectedBotId, '新しいチャット');
-      
-      const newChat: Chat = {
-        id: response.chatId,
-        title: response.title,
-        messages: [],
-        createdAt: new Date(response.createdAt * 1000),
-        updatedAt: new Date(response.createdAt * 1000),
-        botId: response.botId
-      };
-      
-      setChats(prev => [newChat, ...prev]);
-      navigate(`/chat/${newChat.id}`);
-      setIsSidebarOpen(false);
-    } catch (error) {
-      console.error('チャットルームの作成に失敗しました:', error);
-      // エラー時は適切なアラートを表示
-      await showAlert(
-        'チャットルームの作成に失敗しました。しばらく後にお試しください。',
-        'error',
-        'エラー'
-      );
-    }
-  };
-
   // チャット選択
   const handleSelectChat = (chatId: string) => {
     navigate(`/chat/${chatId}`);
     setIsSidebarOpen(false);
+    
+    // チャットのメッセージが未読み込みの場合は取得
+    const selectedChat = chats.find(chat => chat.id === chatId);
+    if (selectedChat && selectedChat.messages.length === 0) {
+      loadChatMessages(chatId);
+    }
   };
 
   // チャット削除
@@ -353,7 +410,7 @@ function MainApp() {
     try {
       // チャットのボットIDを取得
       const targetChat = chats.find(chat => chat.id === targetChatId);
-      const botId = targetChat?.botId || selectedBotId;
+      const botId = targetChat?.botId;
 
       // 実際のAPI呼び出し（ボットIDを含む）
       const response = await api.sendMessage(content, targetChatId);
@@ -482,7 +539,6 @@ function MainApp() {
           currentChat={chat}
           onSendMessage={handleSendMessage}
           isTyping={isTyping}
-          selectedBotId={selectedBotId}
           bots={bots}
         />
       </div>
@@ -497,7 +553,6 @@ function MainApp() {
           currentChat={null}
           onSendMessage={handleSendMessage}
           isTyping={isTyping}
-          selectedBotId={selectedBotId}
           bots={bots}
         />
       </div>
@@ -542,13 +597,10 @@ function MainApp() {
       <div className="flex-1 flex overflow-hidden">
         {/* サイドバー */}
         <Sidebar
-          bots={bots}
-          selectedBotId={selectedBotId}
-          onSelectBot={handleSelectBot}
           chats={chats}
           currentChatId={currentChatId}
           onSelectChat={handleSelectChat}
-          onCreateChat={handleCreateChat}
+          onCreateChat={handleStartNewChat}
           onDeleteChat={handleDeleteChat}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
@@ -572,6 +624,27 @@ function MainApp() {
         message="メッセージを送信中..."
         backdrop="dark"
         size="lg"
+      />
+      <LoadingOverlay
+        isVisible={isCreatingChat}
+        message="新しいチャットを作成中..."
+        backdrop="dark"
+        size="lg"
+      />
+      <LoadingOverlay
+        isVisible={isLoadingChats}
+        message="ボット一覧とチャット一覧を読み込み中..."
+        backdrop="dark"
+        size="lg"
+      />
+
+      {/* ボット選択モーダル */}
+      <BotSelectionModal
+        isOpen={isBotSelectionModalOpen}
+        bots={bots}
+        isLoading={isLoadingChats}
+        onSelectBot={handleBotSelection}
+        onClose={() => setIsBotSelectionModalOpen(false)}
       />
     </div>
   );
