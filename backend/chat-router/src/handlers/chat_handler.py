@@ -7,17 +7,26 @@ import json
 import logging
 import time
 import uuid
-import secrets
 from typing import Any, Dict, Optional
 from decimal import Decimal
 
 try:
     from common.responses import create_error_response, create_success_response
     from common.auth_utils import get_authenticated_user
+    from common.utils import (
+        convert_decimal_to_int,
+        convert_decimal_in_dict,
+        generate_time_ordered_uuid,
+    )
     from storage import DynamoDBManager
 except ImportError:
     from ..common.responses import create_error_response, create_success_response
     from ..common.auth_utils import get_authenticated_user
+    from ..common.utils import (
+        convert_decimal_to_int,
+        convert_decimal_in_dict,
+        generate_time_ordered_uuid,
+    )
     from ..storage import DynamoDBManager
 
 logger = logging.getLogger(__name__)
@@ -29,52 +38,6 @@ class ChatHandler:
     def __init__(self):
         """初期化"""
         self.dynamodb = DynamoDBManager()
-
-    def _generate_time_ordered_uuid(self) -> str:
-        """時間順序付きUUIDを生成
-        
-        フォーマット: {timestamp_ms}-{random_hex}
-        - timestamp_ms: ミリ秒タイムスタンプ（16進数、13桁）
-        - random_hex: 暗号学的に安全な乱数（24桁）
-        
-        Returns:
-            str: 時間順序付きUUID（例: 18c5f2a1b2d-a3f7e8d9c4b5f6g2h1i9j8k7）
-        """
-        # ミリ秒タイムスタンプを16進数に変換
-        timestamp_ms = int(time.time() * 1000)
-        timestamp_hex = format(timestamp_ms, 'x')
-        
-        # 暗号学的に安全な24桁のランダム文字列（96ビット）
-        random_hex = secrets.token_hex(12)  # 12バイト = 24桁の16進数
-        
-        return f"{timestamp_hex}-{random_hex}"
-
-    def _convert_decimal_to_int(self, value: Any) -> Any:
-        """DynamoDBのDecimal型をint/floatに変換
-
-        Args:
-            value: 変換する値
-
-        Returns:
-            変換された値
-        """
-        if isinstance(value, Decimal):
-            return int(value) if value % 1 == 0 else float(value)
-        return value
-
-    def _convert_decimal_in_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """辞書内のDecimal型を変換
-
-        Args:
-            data: 変換する辞書
-
-        Returns:
-            変換された辞書
-        """
-        converted = {}
-        for key, value in data.items():
-            converted[key] = self._convert_decimal_to_int(value)
-        return converted
 
     def handle_request(
         self, method: str, path: str, body: Any, headers: Dict[str, str]
@@ -160,7 +123,7 @@ class ChatHandler:
                 )
 
             # チャットルームIDを生成（時間順序付きUUID）
-            chat_id = self._generate_time_ordered_uuid()
+            chat_id = generate_time_ordered_uuid()
             current_time = int(time.time())
 
             # チャットルームデータ
@@ -231,7 +194,7 @@ class ChatHandler:
             formatted_chats = []
             for chat in chats:
                 # Decimal型を変換
-                converted_chat = self._convert_decimal_in_dict(chat)
+                converted_chat = convert_decimal_in_dict(chat)
                 formatted_chats.append(
                     {
                         "chatId": converted_chat.get("chatId"),
@@ -278,9 +241,12 @@ class ChatHandler:
                 )
 
             chat_data = result["data"]
-            
+
             # デバッグ用ログ
-            logger.info("Chat room data for access check: %s", json.dumps(chat_data, default=str))
+            logger.info(
+                "Chat room data for access check: %s",
+                json.dumps(chat_data, default=str),
+            )
             logger.info("Requesting user_id: %s", user_id)
 
             # 所有者チェック
@@ -367,11 +333,13 @@ class ChatHandler:
             if not result["found"]:
                 logger.warning("Chat room not found for messages request: %s", chat_id)
                 return create_error_response(
-                    404, "Chat Room Not Found", "チャットルームが見つかりません。トップページに戻ってチャットルームを作成してください。"
+                    404,
+                    "Chat Room Not Found",
+                    "チャットルームが見つかりません。トップページに戻ってチャットルームを作成してください。",
                 )
 
             chat_data = result["data"]
-            
+
             # デバッグ用ログ
             logger.info("Chat data retrieved: %s", json.dumps(chat_data, default=str))
             logger.info("Current user_id: %s", user_id)
@@ -379,7 +347,11 @@ class ChatHandler:
 
             # 所有者チェック
             if chat_data.get("userId") != user_id:
-                logger.warning("Unauthorized access attempt to chat room: %s by user: %s", chat_id, user_id)
+                logger.warning(
+                    "Unauthorized access attempt to chat room: %s by user: %s",
+                    chat_id,
+                    user_id,
+                )
                 return create_error_response(
                     403, "Forbidden", "このチャットルームにアクセスする権限がありません"
                 )
@@ -406,7 +378,7 @@ class ChatHandler:
             # メッセージのDecimal型を変換
             formatted_messages = []
             for msg in messages:
-                converted_msg = self._convert_decimal_in_dict(msg)
+                converted_msg = convert_decimal_in_dict(msg)
                 formatted_messages.append(
                     {
                         "id": converted_msg.get("id"),

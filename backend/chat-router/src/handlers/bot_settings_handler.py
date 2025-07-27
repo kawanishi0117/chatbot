@@ -22,6 +22,7 @@ try:
         create_error_response,
     )
     from common.auth_utils import get_authenticated_user, get_authenticated_admin
+    from common.utils import convert_decimal_to_int, generate_time_ordered_uuid
     from handlers.bot_validator import BotValidator
 except ImportError:
     from ..common.responses import (
@@ -29,6 +30,7 @@ except ImportError:
         create_error_response,
     )
     from ..common.auth_utils import get_authenticated_user, get_authenticated_admin
+    from ..common.utils import convert_decimal_to_int, generate_time_ordered_uuid
     from .bot_validator import BotValidator
 
 # ログ設定
@@ -48,18 +50,6 @@ class BotSettingsHandler:
         """ボット設定ハンドラーの初期化"""
         self.validator = BotValidator()
 
-    def _convert_decimal_to_int(self, value: Any) -> Union[int, Any]:
-        """Decimal型の値をintに変換する
-
-        Args:
-            value: 変換対象の値
-
-        Returns:
-            int型に変換された値、またはそのままの値
-        """
-        if isinstance(value, Decimal):
-            return int(value)
-        return value
 
     def handle_request(
         self,
@@ -140,7 +130,7 @@ class BotSettingsHandler:
                 )
 
             # 新しいボットデータを生成
-            bot_id = str(uuid.uuid4())
+            bot_id = generate_time_ordered_uuid()
             current_time = int(time.time() * 1000)  # ミリ秒
 
             bot_data = {
@@ -162,7 +152,7 @@ class BotSettingsHandler:
             access_data = {
                 "PK": f"BOT#{bot_id}",
                 "SK": f"ACCESS#{current_admin['userId']}",
-                "accessId": str(uuid.uuid4()),
+                "accessId": generate_time_ordered_uuid(),
                 "botId": bot_id,
                 "userId": current_admin["userId"],
                 "permission": "admin",
@@ -227,10 +217,10 @@ class BotSettingsHandler:
                             "botName": item["botName"],
                             "description": item.get("description", ""),
                             "creatorId": item["creatorId"],
-                            "createdAt": self._convert_decimal_to_int(
+                            "createdAt": convert_decimal_to_int(
                                 item["createdAt"]
                             ),
-                            "updatedAt": self._convert_decimal_to_int(
+                            "updatedAt": convert_decimal_to_int(
                                 item["updatedAt"]
                             ),
                             "isActive": item.get("isActive", True),
@@ -275,10 +265,10 @@ class BotSettingsHandler:
                                 "botName": item["botName"],
                                 "description": item.get("description", ""),
                                 "creatorId": item["creatorId"],
-                                "createdAt": self._convert_decimal_to_int(
+                                "createdAt": convert_decimal_to_int(
                                     item["createdAt"]
                                 ),
-                                "updatedAt": self._convert_decimal_to_int(
+                                "updatedAt": convert_decimal_to_int(
                                     item["updatedAt"]
                                 ),
                                 "isActive": item.get("isActive", True),
@@ -335,8 +325,8 @@ class BotSettingsHandler:
                 "botName": item["botName"],
                 "description": item.get("description", ""),
                 "creatorId": item["creatorId"],
-                "createdAt": self._convert_decimal_to_int(item["createdAt"]),
-                "updatedAt": self._convert_decimal_to_int(item["updatedAt"]),
+                "createdAt": convert_decimal_to_int(item["createdAt"]),
+                "updatedAt": convert_decimal_to_int(item["updatedAt"]),
                 "isActive": item.get("isActive", True),
             }
 
@@ -435,8 +425,8 @@ class BotSettingsHandler:
                 "botName": updated_item["botName"],
                 "description": updated_item.get("description", ""),
                 "creatorId": updated_item["creatorId"],
-                "createdAt": self._convert_decimal_to_int(updated_item["createdAt"]),
-                "updatedAt": self._convert_decimal_to_int(updated_item["updatedAt"]),
+                "createdAt": convert_decimal_to_int(updated_item["createdAt"]),
+                "updatedAt": convert_decimal_to_int(updated_item["updatedAt"]),
                 "isActive": updated_item.get("isActive", True),
             }
 

@@ -26,8 +26,6 @@ try:
         get_authenticated_admin,
     )
     from common.utils import convert_decimal_to_int, generate_time_ordered_uuid
-    from services.auth_service import AuthService
-    from services.profile_service import ProfileService
 except ImportError:
     from ..common.auth_utils import (
         extract_bearer_token,
@@ -36,8 +34,6 @@ except ImportError:
         get_authenticated_admin,
     )
     from ..common.utils import convert_decimal_to_int, generate_time_ordered_uuid
-    from ..services.auth_service import AuthService
-    from ..services.profile_service import ProfileService
 
 # Lambda実行環境でのモジュールインポートを確保
 try:
@@ -68,9 +64,6 @@ class UserHandler:
         """ユーザーハンドラーの初期化"""
         # セッショントークンの有効期限（24時間）
         self.token_expiry_seconds = 86400
-        # サービス層の初期化
-        self.auth_service = AuthService()
-        self.profile_service = ProfileService()
 
 
     def handle_request(
@@ -96,15 +89,15 @@ class UserHandler:
 
             # HTTPメソッドとパスに基づく処理の振り分け
             if http_method == "POST" and path == "/api/auth/register":
-                return self.auth_service.register(body)
+                return self._handle_register(body)
             elif http_method == "POST" and path == "/api/auth/login":
-                return self.auth_service.login(body)
+                return self._handle_login(body)
             elif http_method == "GET" and path == "/api/auth/me":
-                return self.auth_service.get_current_user(headers)
+                return self._handle_get_current_user(headers)
             elif http_method == "PUT" and path == "/api/auth/me":
-                return self.profile_service.update_profile(body, headers)
+                return self._handle_update_profile(body, headers)
             elif http_method == "POST" and path == "/api/auth/logout":
-                return self.auth_service.logout(headers)
+                return self._handle_logout(headers)
             # ユーザー管理機能
             elif (
                 http_method == "GET"
