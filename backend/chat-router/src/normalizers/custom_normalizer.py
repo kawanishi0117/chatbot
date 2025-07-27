@@ -37,10 +37,17 @@ class CustomNormalizer(BaseNormalizer):
         """
         try:
             # カスタムUIからの必要なデータを抽出
-            room_id = payload.get("roomId")
-            sender_id = payload.get("senderId")
+            chat_id = payload.get("chatId")
+            room_id = payload.get("roomId") or chat_id  # chatIdをroomIdとして使用
+            user_id = payload.get("userId")
+            sender_id = payload.get("senderId") or user_id  # userIdをsenderIdとして使用
             text = payload.get("text")
             timestamp = payload.get("timestamp")
+
+            # 必須フィールドの検証
+            if not room_id or not sender_id or not text:
+                logger.warning("Missing required fields in custom message")
+                return None
 
             # タイムスタンプの処理
             if timestamp:
@@ -58,8 +65,7 @@ class CustomNormalizer(BaseNormalizer):
             # バイナリデータの処理
             binary_data = payload.get("binaryData")
             if binary_data:
-                # S3への保存はstorage.pyで行うため、ここではURIは設定しない
-                pass
+                content_type = payload.get("contentType", "file")
 
             return UnifiedMessage(
                 platform=self.platform_name,

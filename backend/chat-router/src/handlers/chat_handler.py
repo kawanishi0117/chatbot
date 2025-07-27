@@ -7,6 +7,7 @@ import json
 import logging
 import time
 import uuid
+import secrets
 from typing import Any, Dict, Optional
 from decimal import Decimal
 
@@ -28,6 +29,25 @@ class ChatHandler:
     def __init__(self):
         """初期化"""
         self.dynamodb = DynamoDBManager()
+
+    def _generate_time_ordered_uuid(self) -> str:
+        """時間順序付きUUIDを生成
+        
+        フォーマット: {timestamp_ms}-{random_hex}
+        - timestamp_ms: ミリ秒タイムスタンプ（16進数、13桁）
+        - random_hex: 暗号学的に安全な乱数（24桁）
+        
+        Returns:
+            str: 時間順序付きUUID（例: 18c5f2a1b2d-a3f7e8d9c4b5f6g2h1i9j8k7）
+        """
+        # ミリ秒タイムスタンプを16進数に変換
+        timestamp_ms = int(time.time() * 1000)
+        timestamp_hex = format(timestamp_ms, 'x')
+        
+        # 暗号学的に安全な24桁のランダム文字列（96ビット）
+        random_hex = secrets.token_hex(12)  # 12バイト = 24桁の16進数
+        
+        return f"{timestamp_hex}-{random_hex}"
 
     def _convert_decimal_to_int(self, value: Any) -> Any:
         """DynamoDBのDecimal型をint/floatに変換
@@ -139,8 +159,8 @@ class ChatHandler:
                     400, "Bad Request", "指定されたボットは無効です"
                 )
 
-            # チャットルームIDを生成
-            chat_id = str(uuid.uuid4())
+            # チャットルームIDを生成（時間順序付きUUID）
+            chat_id = self._generate_time_ordered_uuid()
             current_time = int(time.time())
 
             # チャットルームデータ
@@ -258,6 +278,10 @@ class ChatHandler:
                 )
 
             chat_data = result["data"]
+            
+            # デバッグ用ログ
+            logger.info("Chat room data for access check: %s", json.dumps(chat_data, default=str))
+            logger.info("Requesting user_id: %s", user_id)
 
             # 所有者チェック
             if chat_data.get("userId") != user_id:
@@ -341,16 +365,30 @@ class ChatHandler:
             # チャットルームの存在確認と所有者チェック
             result = self.dynamodb.get_chat_room(chat_id)
             if not result["found"]:
+                logger.warning("Chat room not found for messages request: %s", chat_id)
                 return create_error_response(
-                    404, "Not Found", "チャットルームが見つかりません"
+                    404, "Chat Room Not Found", "チャットルームが見つかりません。トップページに戻ってチャットルームを作成してください。"
                 )
 
             chat_data = result["data"]
+            
+            # デバッグ用ログ
+            logger.info("Chat data retrieved: %s", json.dumps(chat_data, default=str))
+            logger.info("Current user_id: %s", user_id)
+            logger.info("Chat data userId: %s", chat_data.get("userId"))
 
             # 所有者チェック
             if chat_data.get("userId") != user_id:
+                logger.warning("Unauthorized access attempt to chat room: %s by user: %s", chat_id, user_id)
                 return create_error_response(
                     403, "Forbidden", "このチャットルームにアクセスする権限がありません"
+                )
+
+            # チャットルームのアクティブ状態チェック
+            if not chat_data.get("isActive", True):
+                logger.warning("Inactive chat room access attempt: %s", chat_id)
+                return create_error_response(
+                    403, "Chat Room Inactive", "このチャットルームは無効化されています"
                 )
 
             # メッセージ履歴を取得
@@ -375,6 +413,8 @@ class ChatHandler:
                         "content": converted_msg.get("content"),
                         "role": converted_msg.get("role"),
                         "timestamp": converted_msg.get("timestamp"),
+                        "contentType": converted_msg.get("contentType", "text"),
+                        "s3Uri": converted_msg.get("s3Uri"),
                     }
                 )
 

@@ -62,7 +62,6 @@ function MainApp() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isUserInfoLoading, setIsUserInfoLoading] = useState(false);
-  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   // 新しいボット選択モーダル関連の状態
   const [isBotSelectionModalOpen, setIsBotSelectionModalOpen] = useState(false);
@@ -114,7 +113,8 @@ function MainApp() {
           messages: [], // メッセージは後で必要に応じて取得
           createdAt: new Date(chat.createdAt * 1000),
           updatedAt: new Date(chat.updatedAt * 1000),
-          botId: chat.botId
+          botId: chat.botId,
+          messagesLoaded: false // メッセージは未読み込み
         }));
         setChats(formattedChats);
       }
@@ -140,11 +140,17 @@ function MainApp() {
 
       setChats(prev => prev.map(chat => 
         chat.id === chatId 
-          ? { ...chat, messages: formattedMessages }
+          ? { ...chat, messages: formattedMessages, messagesLoaded: true }
           : chat
       ));
     } catch (error) {
       console.error('Failed to load chat messages:', error);
+      // エラーの場合も読み込み済みフラグを設定して無限ループを防ぐ
+      setChats(prev => prev.map(chat => 
+        chat.id === chatId 
+          ? { ...chat, messagesLoaded: true }
+          : chat
+      ));
     }
   };
 
@@ -171,7 +177,8 @@ function MainApp() {
         messages: [],
         createdAt: new Date(response.createdAt * 1000),
         updatedAt: new Date(response.createdAt * 1000),
-        botId: response.botId
+        botId: response.botId,
+        messagesLoaded: true // 新しいチャットなのでメッセージはない
       };
       
       setChats(prev => [newChat, ...prev]);
@@ -291,6 +298,9 @@ function MainApp() {
           isAuthenticated: true,
           isLoading: false
         });
+
+        // ログイン成功後にボット一覧とチャット一覧を読み込む
+        await loadBotsAndChats(true);
       }
     } catch (error) {
       console.error('Failed to get user info:', error);
@@ -329,16 +339,39 @@ function MainApp() {
     
     // チャットのメッセージが未読み込みの場合は取得
     const selectedChat = chats.find(chat => chat.id === chatId);
-    if (selectedChat && selectedChat.messages.length === 0) {
+    if (selectedChat && !selectedChat.messagesLoaded) {
       loadChatMessages(chatId);
     }
   };
 
   // チャット削除
-  const handleDeleteChat = (deleteChatId: string) => {
-    setChats(prev => prev.filter(chat => chat.id !== deleteChatId));
-    if (currentChatId === deleteChatId) {
-      navigate('/');
+  const handleDeleteChat = async (deleteChatId: string) => {
+    try {
+      // バックエンドAPIでチャットルームを削除
+      await api.deleteChatRoom(deleteChatId);
+      
+      // フロントエンドの状態を更新
+      setChats(prev => prev.filter(chat => chat.id !== deleteChatId));
+      
+      // 現在のチャットが削除されたチャットの場合はトップページにリダイレクト
+      if (currentChatId === deleteChatId) {
+        navigate('/');
+      }
+    } catch (error: any) {
+      console.error('Failed to delete chat:', error);
+      
+      // 認証エラーの場合はログアウト
+      if (error.status === 401) {
+        handleAuthError();
+        return;
+      }
+      
+      // エラー時はアラートを表示
+      await showAlert(
+        'チャットの削除に失敗しました。しばらく後にお試しください。',
+        'error',
+        'エラー'
+      );
     }
   };
 
@@ -382,7 +415,8 @@ function MainApp() {
         title: content.length > 30 ? content.substring(0, 30) + '...' : content,
         messages: [userMessage],
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        messagesLoaded: true // メッセージが既に追加されているので読み込み済み
       };
       setChats(prev => [newChat, ...prev]);
       navigate(`/chat/${newChatId}`);
@@ -405,7 +439,6 @@ function MainApp() {
 
     // タイピングインジケーター表示とオーバーレイローディング開始
     setIsTyping(true);
-    setIsSendingMessage(true);
 
     try {
       // チャットのボットIDを取得
@@ -467,7 +500,6 @@ function MainApp() {
       ));
     } finally {
       setIsTyping(false);
-      setIsSendingMessage(false);
     }
   };
 
@@ -475,8 +507,9 @@ function MainApp() {
   const ChatRoute = () => {
     const chat = currentChat;
     const [isValidating, setIsValidating] = useState(false);
+    const [showNoChatMessage, setShowNoChatMessage] = useState(false);
 
-    // 存在しないチャットIDの場合はトップページにリダイレクト
+    // 存在しないチャットIDの場合はエラー表示またはトップページにリダイレクト
     useEffect(() => {
       const validateChatId = async () => {
         if (!currentChatId) return;
@@ -485,13 +518,17 @@ function MainApp() {
         if (chats.length > 0 && !chat) {
           // チャット一覧が読み込まれているのに該当チャットが見つからない場合
           setIsValidating(true);
+          setShowNoChatMessage(false);
+          
           try {
             // APIでチャットの存在確認
             const exists = await api.checkChatExists(currentChatId);
             if (!exists) {
-              handleInvalidChatId(currentChatId);
+              console.warn(`チャットルームが見つかりません: ${currentChatId}`);
+              setShowNoChatMessage(true);
               return;
             }
+            
             // チャットが存在する場合は情報を取得
             const chatInfo = await api.getChatRoom(currentChatId);
             const newChat: Chat = {
@@ -500,24 +537,42 @@ function MainApp() {
               messages: [], // メッセージは別途取得
               createdAt: new Date(chatInfo.createdAt * 1000),
               updatedAt: new Date(chatInfo.updatedAt * 1000),
-              botId: chatInfo.botId
+              botId: chatInfo.botId,
+              messagesLoaded: false // メッセージは未読み込み
             };
             setChats(prev => [newChat, ...prev.filter(c => c.id !== currentChatId)]);
+            setShowNoChatMessage(false);
+            
+            // チャット情報を取得した後にメッセージ履歴を読み込む
+            await loadChatMessages(currentChatId);
+            
           } catch (error: any) {
             console.error('チャット存在確認エラー:', error);
             if (error.status === 401) {
               handleAuthError();
             } else if (error.status === 404) {
-              handleInvalidChatId(currentChatId);
+              console.warn(`チャットルームが見つかりません (API): ${currentChatId}`);
+              setShowNoChatMessage(true);
+            } else {
+              // その他のエラーの場合もチャットルーム未作成として扱う
+              setShowNoChatMessage(true);
             }
           } finally {
             setIsValidating(false);
+          }
+        } else if (chats.length > 0 && chat) {
+          // チャットが見つかった場合はエラー表示をリセット
+          setShowNoChatMessage(false);
+          
+          // チャットのメッセージが未読み込みの場合は取得
+          if (!chat.messagesLoaded) {
+            loadChatMessages(currentChatId);
           }
         }
       };
 
       validateChatId();
-    }, [currentChatId, chat, chats.length]); // chats.lengthに変更してループを防止
+    }, [currentChatId, chat, chats.length]);
 
     // チャット存在確認中の表示
     if (isValidating) {
@@ -540,6 +595,9 @@ function MainApp() {
           onSendMessage={handleSendMessage}
           isTyping={isTyping}
           bots={bots}
+          onStartNewChat={handleStartNewChat}
+          showNoChatRoomMessage={showNoChatMessage}
+          hasChats={chats.length > 0}
         />
       </div>
     );
@@ -547,13 +605,24 @@ function MainApp() {
 
   // ホームページ用のコンポーネント
   const HomeRoute = () => {
+    // ルートアクセス時の処理
+    useEffect(() => {
+      // チャット履歴がある場合は最新のチャットにリダイレクト
+      if (chats.length > 0 && !isLoadingChats) {
+        const latestChat = chats[0]; // chatsは新しい順にソートされている
+        navigate(`/chat/${latestChat.id}`, { replace: true });
+      }
+    }, [chats, isLoadingChats, navigate]);
+
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
         <ChatArea
           currentChat={null}
-          onSendMessage={handleSendMessage}
+          onSendMessage={() => {}} // ルート画面では送信を無効化
           isTyping={isTyping}
           bots={bots}
+          onStartNewChat={handleStartNewChat}
+          hasChats={chats.length > 0}
         />
       </div>
     );
@@ -620,12 +689,6 @@ function MainApp() {
         size="lg"
       />
       <LoadingOverlay
-        isVisible={isSendingMessage}
-        message="メッセージを送信中..."
-        backdrop="dark"
-        size="lg"
-      />
-      <LoadingOverlay
         isVisible={isCreatingChat}
         message="新しいチャットを作成中..."
         backdrop="dark"
@@ -633,7 +696,7 @@ function MainApp() {
       />
       <LoadingOverlay
         isVisible={isLoadingChats}
-        message="ボット一覧とチャット一覧を読み込み中..."
+        message="チャットを読み込み中..."
         backdrop="dark"
         size="lg"
       />

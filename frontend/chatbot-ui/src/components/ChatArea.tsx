@@ -1,4 +1,4 @@
-import { Bot, Sparkles } from 'lucide-react';
+import { Bot, Sparkles, Plus } from 'lucide-react';
 import React, { useEffect, useRef } from 'react';
 import { Chat } from '../types';
 import ChatInput from './ChatInput';
@@ -14,13 +14,19 @@ interface ChatAreaProps {
     description: string;
     isActive: boolean;
   }>;
+  onStartNewChat?: () => void;
+  showNoChatRoomMessage?: boolean;
+  hasChats?: boolean;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({ 
   currentChat, 
   onSendMessage, 
   isTyping, 
-  bots = [] 
+  bots = [],
+  onStartNewChat,
+  showNoChatRoomMessage = false,
+  hasChats = true
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -40,36 +46,101 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           質問や相談をお気軽にどうぞ。AIがお答えします。
         </p>
         
-        {/* サンプル質問 */}
-        <div className="space-y-2">
-          <p className="text-sm font-semibold text-gray-700 mb-3">例えば、こんなことを聞いてみてください：</p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {[
-              '今日の天気はどうですか？',
-              'JavaScriptについて教えて',
-              'おすすめのレシピを教えて',
-              '効率的な勉強方法は？'
-            ].map((suggestion, index) => (
+        {/* チャット履歴がない場合の特別表示 */}
+        {!hasChats && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+            <h3 className="text-lg font-semibold text-blue-900 mb-2">新しいチャットを開始しましょう</h3>
+            <p className="text-blue-700 mb-4">
+              まずはチャットルームを作成して、AIアシスタントとの会話を始めてください。
+            </p>
+            
+            {onStartNewChat && (
               <button
-                key={index}
-                onClick={() => onSendMessage(suggestion)}
-                className="px-4 py-3 text-sm bg-white text-blue-700 rounded-lg hover:bg-blue-50 hover:shadow-md transition-all border border-blue-200 flex items-center"
+                onClick={onStartNewChat}
+                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
               >
-                <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
-                <span className="text-left">{suggestion}</span>
+                <Plus className="w-5 h-5 mr-2" />
+                新しいチャットを作成
               </button>
-            ))}
+            )}
           </div>
+        )}
+        
+        {/* サンプル質問 (チャット履歴がある場合のみ表示) */}
+        {hasChats && (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-gray-700 mb-3">例えば、こんなことを聞いてみてください：</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[
+                '今日の天気はどうですか？',
+                'JavaScriptについて教えて',
+                'おすすめのレシピを教えて',
+                '効率的な勉強方法は？'
+              ].map((suggestion, index) => (
+                <button
+                  key={index}
+                  onClick={() => onSendMessage(suggestion)}
+                  className="px-4 py-3 text-sm bg-white text-blue-700 rounded-lg hover:bg-blue-50 hover:shadow-md transition-all border border-blue-200 flex items-center"
+                >
+                  <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
+                  <span className="text-left">{suggestion}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const NoChatRoomState = () => (
+    <div className="flex-1 flex items-center justify-center p-3 overflow-y-auto scrollbar-thin">
+      <div className="text-center max-w-2xl">
+        <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+          <Bot className="w-10 h-10 text-white" />
+        </div>
+        <h2 className="text-3xl font-bold text-gray-900 mb-2">チャットルームが見つかりません</h2>
+        <p className="text-lg text-gray-600 mb-6">
+          指定されたチャットルームは存在しないか、削除されています。
+        </p>
+        
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+          <h3 className="text-lg font-semibold text-blue-900 mb-2">新しいチャットを開始しましょう</h3>
+          <p className="text-blue-700 mb-4">
+            まずはチャットルームを作成して、AIアシスタントとの会話を始めてください。
+          </p>
+          
+          {onStartNewChat && (
+            <button
+              onClick={onStartNewChat}
+              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              新しいチャットを作成
+            </button>
+          )}
+        </div>
+        
+        <div className="text-sm text-gray-500">
+          <p>サイドバーから既存のチャットを選択するか、新しいチャットを作成してください。</p>
         </div>
       </div>
     </div>
   );
 
   if (!currentChat) {
+    if (showNoChatRoomMessage) {
+      return (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <NoChatRoomState />
+        </div>
+      );
+    }
+    
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
         <EmptyState />
-        <ChatInput onSendMessage={onSendMessage} />
+        {/* ルート画面では入力欄を表示しない */}
       </div>
     );
   }

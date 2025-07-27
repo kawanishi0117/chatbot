@@ -54,9 +54,10 @@ def save_message(message: UnifiedMessage) -> Dict[str, Any]:
         ttl = int(time.time()) + TTL_SECONDS
 
         # DynamoDBに保存するアイテムの作成
+        # タイムスタンプを0パディングした文字列に変換（ソート順を保証）
         item = {
             "PK": message.room_key,
-            "SK": message.ts,
+            "SK": f"{message.ts:019d}",  # 19桁にゼロパディング（ミリ秒タイムスタンプに対応）
             "role": message.role,
             "contentType": message.content_type,
             "ttl": ttl,
@@ -166,6 +167,7 @@ def get_recent_messages(room_key: str, limit: int = 6) -> list:
         items = response.get("Items", [])
 
         # タイムスタンプで昇順にソート（古い順）
+        # SKはゼロパディングされた文字列なので、文字列ソートで時系列順になる
         items.sort(key=lambda x: x["SK"])
 
         logger.info("Retrieved %d messages for room %s", len(items), room_key)
@@ -297,6 +299,7 @@ class DynamoDBManager:
                 "PK": f"USER#{user_id}",
                 "SK": f"CHAT#{chat_id}",
                 "chatId": chat_id,
+                "userId": user_id,  # ← userIdフィールドを追加
                 "title": chat_data.get("title", "新しいチャット"),
                 "botId": chat_data["botId"],
                 "botName": chat_data.get("botName", "Unknown Bot"),
@@ -393,11 +396,44 @@ class DynamoDBManager:
             if not user_id:
                 return {"success": False, "error": "Invalid chat room data"}
 
+            # チャットのメッセージを削除
+            room_key = f"custom:{chat_id}"
+            try:
+                # メッセージ履歴をクエリして削除
+                messages_result = self.get_chat_messages(chat_id)
+                if messages_result["success"]:
+                    messages = messages_result.get("data", [])
+                    logger.info(
+                        f"Deleting {len(messages)} messages for chat room {chat_id}"
+                    )
+
+                    # 各メッセージを削除
+                    for message in messages:
+                        message_id = message.get("id")
+                        if message_id:
+                            try:
+                                self.chat_table.delete_item(
+                                    Key={"PK": room_key, "SK": message_id}
+                                )
+                            except Exception as msg_e:
+                                logger.warning(
+                                    f"Failed to delete message {message_id}: {str(msg_e)}"
+                                )
+                else:
+                    logger.warning(
+                        f"Could not retrieve messages for chat room {chat_id}: {messages_result.get('error')}"
+                    )
+            except Exception as msg_error:
+                logger.warning(
+                    f"Error deleting messages for chat room {chat_id}: {str(msg_error)}"
+                )
+
             # チャットルームレコードを削除
             self.settings_table.delete_item(
                 Key={"PK": f"USER#{user_id}", "SK": f"CHAT#{chat_id}"}
             )
 
+            logger.info(f"Chat room {chat_id} and its messages deleted successfully")
             return {"success": True}
 
         except Exception as e:
@@ -415,11 +451,15 @@ class DynamoDBManager:
             dict: メッセージ履歴データまたはエラー情報
         """
         try:
-            # ルームキーを生成（チャットIDベース）
-            room_key = f"CHAT#{chat_id}"
-
-            # メッセージを取得
+            # ルームキーを生成（様々なプラットフォーム対応）
+            # まずcustomプラットフォーム形式で試す
+            room_key = f"custom:{chat_id}"
             messages = get_recent_messages(room_key, limit)
+
+            # customで見つからない場合は従来のCHAT#形式で試す
+            if not messages:
+                room_key = f"CHAT#{chat_id}"
+                messages = get_recent_messages(room_key, limit)
 
             # メッセージをAPIレスポンス用に変換
             formatted_messages = []
@@ -430,6 +470,8 @@ class DynamoDBManager:
                     "content": msg.get("text", ""),
                     "role": msg.get("role", "user"),  # userまたはassistant
                     "timestamp": msg.get("SK", ""),  # タイムスタンプ
+                    "contentType": msg.get("contentType", "text"),  # コンテンツタイプ
+                    "s3Uri": msg.get("s3Uri"),  # S3 URI（該当する場合）
                 }
                 formatted_messages.append(message_data)
 

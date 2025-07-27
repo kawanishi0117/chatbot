@@ -32,6 +32,43 @@ class CustomWebhookHandler(BaseWebhookHandler):
         super().__init__("custom", custom_secret)
         self.normalizer = CustomNormalizer()
 
+    def _pre_process(self, body: Any, event: dict) -> Optional[dict]:
+        """前処理でチャットルームの存在確認を実行"""
+        chat_id = body.get("chatId")
+        if chat_id:
+            try:
+                dynamodb_manager = storage.DynamoDBManager()
+                chat_result = dynamodb_manager.get_chat_room(chat_id)
+                if not chat_result["found"]:
+                    logger.warning("Chat room not found: %s", chat_id)
+                    return {
+                        "statusCode": 404,
+                        "body": json.dumps({
+                            "error": "Chat room not found",
+                            "message": "チャットルームが見つかりません。まずチャットルームを作成してください。"
+                        })
+                    }
+                
+                # チャットルームのアクティブ状態チェック
+                chat_data = chat_result["data"]
+                if not chat_data.get("isActive", True):
+                    logger.warning("Chat room is inactive: %s", chat_id)
+                    return {
+                        "statusCode": 403,
+                        "body": json.dumps({
+                            "error": "Chat room inactive",
+                            "message": "チャットルームが無効化されています。"
+                        })
+                    }
+                    
+            except Exception as e:
+                logger.error("Error checking chat room existence: %s", str(e))
+                return {
+                    "statusCode": 500,
+                    "body": json.dumps({"error": "Failed to verify chat room"})
+                }
+        return None
+
     def _verify_signature(self, body: Any, event: dict) -> bool:
         """カスタムUI署名の検証
 

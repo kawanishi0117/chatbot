@@ -205,19 +205,17 @@ class ApiClient {
   }
 
   // チャット用Webhook API
-  async sendMessage(message: string, roomId: string) {
+  async sendMessage(message: string, chatId: string) {
     const response = await this.request<{
       status: string;
       message: string;
     }>('/webhook/custom', {
       method: 'POST',
       body: JSON.stringify({
-        roomId,
+        chatId,
+        text: message,
         userId: 'user',
-        message: {
-          text: message,
-          timestamp: new Date().toISOString(),
-        },
+        timestamp: Date.now(),
       }),
     });
     return response;

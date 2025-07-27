@@ -1,0 +1,6 @@
+version = 0.1
+
+[default.local_start_api.parameters]
+warm_containers = "EAGER"
+container_idle_timeout = 3600
+skip_pull_image = true

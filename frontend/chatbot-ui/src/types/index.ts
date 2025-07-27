@@ -12,6 +12,7 @@ export interface Chat {
   createdAt: Date;
   updatedAt: Date;
   botId?: string; // チャットで使用されるボットID
+  messagesLoaded?: boolean; // メッセージ読み込み済みフラグ
 }
 
 export interface User {
