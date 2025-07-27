@@ -34,6 +34,7 @@ function AppContent() {
   const [isSavingBot, setIsSavingBot] = useState(false);
   const [isLoadingBots, setIsLoadingBots] = useState(false);
   const [isDeletingBot, setIsDeletingBot] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Get current view from URL path
   const getCurrentView = () => {
@@ -221,11 +222,10 @@ function AppContent() {
   };
 
   const handleLogout = async () => {
+    setIsLoggingOut(true);
     try {
       await api.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
+      // ログアウト成功後に状態をリセット
       setAuthState({
         user: null,
         isAuthenticated: false,
@@ -233,6 +233,18 @@ function AppContent() {
       });
       setChatbots([]);
       setSelectedChatbot(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+      // エラーが発生してもログアウト状態にする
+      setAuthState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false
+      });
+      setChatbots([]);
+      setSelectedChatbot(null);
+    } finally {
+      setIsLoggingOut(false);
       navigate('/bots');
     }
   };
@@ -257,6 +269,19 @@ function AppContent() {
 
   const handleToggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  // 認証エラー処理
+  const handleAuthError = () => {
+    console.warn('認証エラーが発生しました。ログアウトします。');
+    setAuthState({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false
+    });
+    setChatbots([]);
+    setSelectedChatbot(null);
+    navigate('/bots');
   };
 
   // 新しいチャットボット作成
@@ -331,21 +356,86 @@ function AppContent() {
   // ボット詳細ページ用のコンポーネント
   const BotDetailRoute = ({ view }: { view: string }) => {
     const { botId } = useParams<{ botId: string }>();
+    const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+    const [isCheckingAccess, setIsCheckingAccess] = useState(false);
     
-    // URLのボットIDに基づいてselectedChatbotを設定
+    // ボットアクセス権限をチェック
     useEffect(() => {
-      if (botId && chatbots.length > 0) {
-        const bot = chatbots.find(b => b.id === botId);
-        if (bot && (!selectedChatbot || selectedChatbot.id !== botId)) {
-          setSelectedChatbot(bot);
-        } else if (!bot) {
-          // ボットが見つからない場合はボット一覧に戻る
-          navigate('/bots');
+      const checkAccess = async () => {
+        if (!botId) {
+          // ボットIDが存在しない場合はトップページにリダイレクト
+          navigate('/bots', { replace: true });
+          return;
         }
+        
+        setIsCheckingAccess(true);
+        try {
+          const accessCheck = await api.checkBotAccess(botId);
+          setHasAccess(accessCheck);
+          
+          if (!accessCheck) {
+            showAlert('このボットへのアクセス権限がありません', 'error');
+            navigate('/bots', { replace: true });
+            return;
+          }
+          
+          // アクセス権限がある場合、ボット一覧からボット情報を取得
+          if (chatbots.length > 0) {
+            const bot = chatbots.find(b => b.id === botId);
+            if (!bot) {
+              // ボットが見つからない場合はトップページにリダイレクト
+              showAlert('指定されたボットが見つかりません', 'error');
+              navigate('/bots', { replace: true });
+              return;
+            }
+            if (!selectedChatbot || selectedChatbot.id !== botId) {
+              setSelectedChatbot(bot);
+            }
+          }
+        } catch (error: any) {
+          console.error('Access check failed:', error);
+          
+          // 認証エラーの場合はログアウト
+          if (error.status === 401) {
+            handleAuthError();
+            return;
+          }
+          
+          // 404エラーや存在しないボットの場合
+          if (error.message && (
+            error.message.includes('404') || 
+            error.message.includes('Not Found') ||
+            error.message.includes('not found') ||
+            error.message.includes('does not exist')
+          )) {
+            showAlert('指定されたボットが見つかりません', 'error');
+          } else {
+            showAlert('アクセス権限の確認に失敗しました: ' + (error.message || 'Unknown error'), 'error');
+          }
+          navigate('/bots', { replace: true });
+        } finally {
+          setIsCheckingAccess(false);
+        }
+      };
+      
+      if (botId) {
+        checkAccess();
       }
-    }, [botId, chatbots, selectedChatbot, navigate]);
+    }, [botId, chatbots.length, selectedChatbot?.id, navigate, showAlert]); // 依存配列を最適化
 
-    if (!botId || !selectedChatbot || selectedChatbot.id !== botId) {
+    // アクセス権限チェック中の表示
+    if (isCheckingAccess || hasAccess === null) {
+      return (
+        <div className="h-full flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">アクセス権限を確認中...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!botId || !hasAccess || !selectedChatbot || selectedChatbot.id !== botId) {
       return <Navigate to="/bots" replace />;
     }
 
@@ -516,8 +606,42 @@ function AppContent() {
     );
   }
 
-  if (!authState.isAuthenticated) {
+  if (!authState.isAuthenticated || !authState.user) {
     return <Login onLogin={handleLogin} />;
+  }
+
+  // 管理者権限チェック
+  if (authState.user.role !== 'admin') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
+          <div className="w-16 h-16 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
+            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">アクセス権限がありません</h1>
+          <p className="text-gray-600 mb-6">
+            管理画面へのアクセスには管理者権限が必要です。<br />
+            現在のアカウント（{authState.user.email}）は一般ユーザーです。
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={() => {
+                api.logout();
+                window.location.reload();
+              }}
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              別のアカウントでログイン
+            </button>
+            <p className="text-sm text-gray-500">
+              管理者権限が必要な場合は、システム管理者にお問い合わせください。
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -527,6 +651,7 @@ function AppContent() {
         onLogout={handleLogout}
         onToggleSidebar={handleToggleSidebar}
         isSidebarOpen={isSidebarOpen}
+        isLoggingOut={isLoggingOut}
         onUserUpdate={handleUserUpdate}
       />
       
@@ -566,6 +691,8 @@ function AppContent() {
               <Route path="/webhooks" element={<Navigate to="/bots" replace />} />
               <Route path="/users" element={<Navigate to="/bots" replace />} />
               <Route path="/security" element={<Navigate to="/bots" replace />} />
+              {/* 存在しないパスは全てトップページ（/bots）にリダイレクト */}
+              <Route path="*" element={<Navigate to="/bots" replace />} />
             </Routes>
           </div>
         </main>

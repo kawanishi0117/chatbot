@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pylint:*)",
+      "Bash(sam build:*)",
+      "Bash(python3:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run lint)",
+      "Bash(npx tsc:*)",
+      "Bash(python test:*)",
+      "Bash(rm:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(python:*)",
+      "Bash(cp:*)",
+      "Bash(npm run lint:*)",
+      "Bash(timeout 10s npm run dev)",
+      "Bash(true)"
+    ],
+    "deny": []
+  }
+}

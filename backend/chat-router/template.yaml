@@ -71,6 +71,31 @@ Resources:
           Properties:
             Path: /api/auth/login
             Method: POST
+        AuthMeAPI:
+          Type: Api
+          Properties:
+            Path: /api/auth/me
+            Method: ANY
+        AuthLogoutAPI:
+          Type: Api
+          Properties:
+            Path: /api/auth/logout
+            Method: POST
+        ChatsAPI:
+          Type: Api
+          Properties:
+            Path: /api/chats
+            Method: ANY
+        ChatsDetailAPI:
+          Type: Api
+          Properties:
+            Path: /api/chats/{chatId}
+            Method: ANY
+        ChatsMessagesAPI:
+          Type: Api
+          Properties:
+            Path: /api/chats/{chatId}/messages
+            Method: GET
         AuthCurrentUserAPI:
           Type: Api
           Properties:
@@ -80,4 +105,30 @@ Resources:
           Type: Api
           Properties:
             Path: /api/auth/logout
+            Method: POST
+        # ユーザー管理API
+        BotUsersAPI:
+          Type: Api
+          Properties:
+            Path: /api/bots/{botId}/users
+            Method: GET
+        BotInviteAPI:
+          Type: Api
+          Properties:
+            Path: /api/bots/{botId}/invite
+            Method: POST
+        BotUserPermissionAPI:
+          Type: Api
+          Properties:
+            Path: /api/bots/{botId}/users/{userId}
+            Method: ANY
+        InvitationAPI:
+          Type: Api
+          Properties:
+            Path: /api/invitations/{invitationId}
+            Method: GET
+        InvitationAcceptAPI:
+          Type: Api
+          Properties:
+            Path: /api/invitations/{invitationId}/accept
             Method: POST

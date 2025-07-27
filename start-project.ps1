@@ -5,9 +5,15 @@ Write-Host "チャットボットプロジェクトを起動しています..." 
 Write-Host "バックエンドを起動中..." -ForegroundColor Yellow
 Start-Process -FilePath "powershell" -ArgumentList "-Command", "cd backend/chat-router; sam build; sam local start-api" -WindowStyle Normal
 
+# 1秒待機
+Start-Sleep -Seconds 1
+
 # フロントエンド1起動 (chatbot-console)
 Write-Host "フロントエンド (chatbot-console) を起動中..." -ForegroundColor Yellow
 Start-Process -FilePath "powershell" -ArgumentList "-Command", "cd frontend/chatbot-console; npm run dev" -WindowStyle Normal
+
+# 1秒待機
+Start-Sleep -Seconds 1
 
 # フロントエンド2起動 (chatbot-ui)
 Write-Host "フロントエンド (chatbot-ui) を起動中..." -ForegroundColor Yellow

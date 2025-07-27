@@ -1,13 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
-import { Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import ChatArea from './components/ChatArea';
 import Header from './components/Header';
+
+import BotSelectionModal from './components/BotSelectionModal';
 import { LoadingOverlay, LoadingSpinner } from './components/loading';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
-import { AlertProvider } from './contexts/AlertContext';
-import { api, getToken } from './services/api';
-import { AuthState, Chat, Message } from './types';
+import { AlertProvider, useAlert } from './contexts/AlertContext';
+import { useAuth, useChat } from './hooks';
+import { api } from './services/api';
+import { Chat, Message } from './types';
 
 // デモ用のAI応答生成関数
 const generateAIResponse = (userMessage: string): string => {
@@ -40,21 +43,42 @@ const generateAIResponse = (userMessage: string): string => {
   return responses[Math.floor(Math.random() * responses.length)];
 };
 
-function AppContent() {
-  const navigate = useNavigate();
+function MainApp() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { showAlert } = useAlert();
   
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    isAuthenticated: false,
-    isLoading: true
-  });
+  // Custom hooks
+  const {
+    authState,
+    isUserInfoLoading,
+    checkAuth,
+    handleLogin,
+    handleLogout,
+    handleAuthError,
+    handleUserUpdate
+  } = useAuth();
 
-  const [chats, setChats] = useState<Chat[]>([]);
+  const {
+    chats,
+    bots,
+    isLoadingChats,
+    setChats,
+    loadBotsAndChats,
+    loadChatMessages,
+    handleSelectChat: selectChat,
+    handleDeleteChat: deleteChat,
+    createChatRoom,
+    addChatFromApi,
+    handleInvalidChatId
+  } = useChat();
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [isUserInfoLoading, setIsUserInfoLoading] = useState(false);
-  const [isSendingMessage, setIsSendingMessage] = useState(false);
+
+  // 新しいボット選択モーダル関連の状態
+  const [isBotSelectionModalOpen, setIsBotSelectionModalOpen] = useState(false);
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
 
   // URLから現在のチャットIDを取得
   const getCurrentChatId = (): string | null => {
@@ -65,182 +89,69 @@ function AppContent() {
 
   const currentChatId = getCurrentChatId();
 
-  // 認証チェックの重複実行を防ぐためのref
-  const authCheckInProgress = useRef(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
   // 現在のチャットを取得
   const currentChat = chats.find(chat => chat.id === currentChatId) || null;
-
-  // ユーザー情報更新処理
-  const handleUserUpdate = (updatedUser: any) => {
-    setAuthState(prev => ({
-      ...prev,
-      user: updatedUser
-    }));
-  };
 
   // サイドバートグル処理
   const handleToggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
+  // 新しいチャット開始ボタンクリック（ボット選択モーダルを開く）
+  const handleStartNewChat = () => {
+    setIsBotSelectionModalOpen(true);
+  };
+
+  // ボット選択モーダルでのボット選択
+  const handleBotSelection = async (botId: string) => {
+    setIsCreatingChat(true);
+    try {
+      const newChat = await createChatRoom(botId, '新しいチャット');
+      navigate(`/chat/${newChat.id}`);
+      setIsSidebarOpen(false);
+    } catch (error) {
+      console.error('チャットルームの作成に失敗しました:', error);
+      // エラー時は適切なアラートを表示
+      await showAlert(
+        'チャットルームの作成に失敗しました。しばらく後にお試しください。',
+        'error',
+        'エラー'
+      );
+    } finally {
+      setIsCreatingChat(false);
+    }
+  };
+
   // 初期化時にトークンをチェック
   useEffect(() => {
-    let isMounted = true; // マウント状態の追跡
+    let cleanup: (() => void) | undefined;
     
-    const checkAuth = async () => {
-      // 既に認証チェックが進行中の場合は何もしない
-      if (authCheckInProgress.current) {
-        return;
-      }
-
-      authCheckInProgress.current = true;
-      
-      // 前回のリクエストがあればキャンセル
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      
-      // 新しいAbortControllerを作成
-      abortControllerRef.current = new AbortController();
-
-      const token = getToken();
-      if (token) {
-        try {
-          const user = await api.getCurrentUser();
-          
-          // コンポーネントがマウントされており、リクエストがキャンセルされていないかチェック
-          if (isMounted && !abortControllerRef.current?.signal.aborted) {
-            setAuthState({
-              user: {
-                id: user.userId,
-                email: user.email,
-                name: user.name
-              },
-              isAuthenticated: true,
-              isLoading: false
-            });
-          }
-        } catch (error) {
-          // リクエストがキャンセルされた場合は何もしない
-          if (abortControllerRef.current?.signal.aborted || !isMounted) {
-            return;
-          }
-          
-          // トークンが無効な場合
-          api.logout();
-          setAuthState({
-            user: null,
-            isAuthenticated: false,
-            isLoading: false
-          });
-        }
-      } else {
-        if (isMounted) {
-          setAuthState({
-            user: null,
-            isAuthenticated: false,
-            isLoading: false
-          });
-        }
-      }
-      
-      authCheckInProgress.current = false;
+    const performAuthCheck = async () => {
+      cleanup = await checkAuth(loadBotsAndChats);
     };
     
-    checkAuth();
-
-    // クリーンアップ関数
+    performAuthCheck();
+    
     return () => {
-      isMounted = false; // アンマウント時にフラグを無効化
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+      if (cleanup) {
+        cleanup();
       }
-      authCheckInProgress.current = false;
     };
-  }, []);
+  }, []); // 依存配列を空にして初回のみ実行
 
-  // ログイン処理
-  const handleLogin = async (_email: string, _password: string) => {
-    // Login コンポーネント内で既にAPIを呼び出しているので、
-    // ここではユーザー情報を再取得せずに、ログイン成功を処理
-    setIsUserInfoLoading(true);
-    try {
-      // ログイン後は認証チェックの重複を防ぐためにフラグをリセット
-      authCheckInProgress.current = false;
-      
-      // トークンが既に設定されているはずなので、ユーザー情報を取得
-      // ただし、重複チェックを避けるため、既に進行中でないことを確認
-      if (!authCheckInProgress.current) {
-        const user = await api.getCurrentUser();
-        setAuthState({
-          user: {
-            id: user.userId,
-            email: user.email,
-            name: user.name
-          },
-          isAuthenticated: true,
-          isLoading: false
-        });
-      }
-    } catch (error) {
-      console.error('Failed to get user info:', error);
-      // エラーの場合は認証状態をリセット
-      setAuthState({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false
-      });
-    } finally {
-      setIsUserInfoLoading(false);
-    }
+  // ログイン処理（カスタムフックのhandleLoginを使用）
+  const onLogin = async (email: string, password: string) => {
+    await handleLogin(loadBotsAndChats);
   };
 
-  // ログアウト処理
-  const handleLogout = async () => {
-    try {
-      await api.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      setAuthState({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false
-      });
-      setChats([]);
-      navigate('/');
-    }
-  };
-
-  // 新しいチャット作成
-  const handleCreateChat = () => {
-    const newChat: Chat = {
-      id: Date.now().toString(),
-      title: '新しいチャット',
-      messages: [],
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    
-    setChats(prev => [newChat, ...prev]);
-    navigate(`/chat/${newChat.id}`);
-    setIsSidebarOpen(false);
-  };
-
-  // チャット選択
+  // チャット選択（カスタムフックを使用）
   const handleSelectChat = (chatId: string) => {
-    navigate(`/chat/${chatId}`);
-    setIsSidebarOpen(false);
+    selectChat(chatId, setIsSidebarOpen);
   };
 
-  // チャット削除
-  const handleDeleteChat = (deleteChatId: string) => {
-    setChats(prev => prev.filter(chat => chat.id !== deleteChatId));
-    if (currentChatId === deleteChatId) {
-      navigate('/');
-    }
+  // チャット削除（カスタムフックを使用）
+  const handleDeleteChat = async (deleteChatId: string) => {
+    await deleteChat(deleteChatId, handleAuthError);
   };
 
   // メッセージ送信
@@ -265,7 +176,8 @@ function AppContent() {
         title: content.length > 30 ? content.substring(0, 30) + '...' : content,
         messages: [userMessage],
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        messagesLoaded: true // メッセージが既に追加されているので読み込み済み
       };
       setChats(prev => [newChat, ...prev]);
       navigate(`/chat/${newChatId}`);
@@ -288,7 +200,6 @@ function AppContent() {
 
     // タイピングインジケーター表示とオーバーレイローディング開始
     setIsTyping(true);
-    setIsSendingMessage(true);
 
     try {
       // 実際のAPI呼び出し
@@ -311,9 +222,24 @@ function AppContent() {
             }
           : chat
       ));
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to send message:', error);
-      // エラー時はデモ応答を使用
+      
+      const errorResponse = error as { status?: number };
+      // 認証エラーの場合はログアウト
+      if (errorResponse.status === 401) {
+        handleAuthError();
+        return;
+      }
+      
+      // 404エラー（チャットが存在しない）の場合はトップページにリダイレクト
+      if (errorResponse.status === 404) {
+        console.warn(`チャットが存在しません: ${targetChatId}`);
+        handleInvalidChatId(targetChatId);
+        return;
+      }
+      
+      // その他のエラーの場合はデモ応答を使用
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: generateAIResponse(content),
@@ -332,14 +258,83 @@ function AppContent() {
       ));
     } finally {
       setIsTyping(false);
-      setIsSendingMessage(false);
     }
   };
 
   // チャット詳細ページ用のコンポーネント
   const ChatRoute = () => {
-    const { chatId } = useParams<{ chatId: string }>();
-    const chat = chats.find(c => c.id === chatId) || null;
+    const chat = currentChat;
+    const [isValidating, setIsValidating] = useState(false);
+    const [showNoChatMessage, setShowNoChatMessage] = useState(false);
+
+    // 存在しないチャットIDの場合はエラー表示またはトップページにリダイレクト
+    useEffect(() => {
+      const validateChatId = async () => {
+        if (!currentChatId) return;
+        
+        // ローカルのチャット一覧に存在するかチェック
+        if (chats.length > 0 && !chat) {
+          // チャット一覧が読み込まれているのに該当チャットが見つからない場合
+          setIsValidating(true);
+          setShowNoChatMessage(false);
+          
+          try {
+            // APIでチャットの存在確認
+            const exists = await api.checkChatExists(currentChatId);
+            if (!exists) {
+              console.warn(`チャットルームが見つかりません: ${currentChatId}`);
+              setShowNoChatMessage(true);
+              return;
+            }
+            
+            // チャットが存在する場合は情報を取得
+            const success = await addChatFromApi(currentChatId);
+            if (success) {
+              setShowNoChatMessage(false);
+            }
+            
+          } catch (error: unknown) {
+            console.error('チャット存在確認エラー:', error);
+            const errorResponse = error as { status?: number };
+            if (errorResponse.status === 401) {
+              handleAuthError();
+            } else if (errorResponse.status === 404) {
+              console.warn(`チャットルームが見つかりません (API): ${currentChatId}`);
+              setShowNoChatMessage(true);
+            } else {
+              // その他のエラーの場合もチャットルーム未作成として扱う
+              setShowNoChatMessage(true);
+            }
+          } finally {
+            setIsValidating(false);
+          }
+        } else if (chats.length > 0 && chat) {
+          // チャットが見つかった場合はエラー表示をリセット
+          setShowNoChatMessage(false);
+          
+          // チャットのメッセージが未読み込みの場合は取得
+          if (!chat.messagesLoaded) {
+            loadChatMessages(currentChatId);
+          }
+        }
+      };
+
+      validateChatId();
+    }, [currentChatId, chat, chats.length, addChatFromApi, handleAuthError]);
+
+    // チャット存在確認中の表示
+    if (isValidating) {
+      return (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">チャットを確認中...</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -347,6 +342,10 @@ function AppContent() {
           currentChat={chat}
           onSendMessage={handleSendMessage}
           isTyping={isTyping}
+          bots={bots}
+          onStartNewChat={handleStartNewChat}
+          showNoChatRoomMessage={showNoChatMessage}
+          hasChats={chats.length > 0}
         />
       </div>
     );
@@ -354,16 +353,29 @@ function AppContent() {
 
   // ホームページ用のコンポーネント
   const HomeRoute = () => {
+    // ルートアクセス時の処理
+    useEffect(() => {
+      // チャット履歴がある場合は最新のチャットにリダイレクト
+      if (chats.length > 0 && !isLoadingChats) {
+        const latestChat = chats[0]; // chatsは新しい順にソートされている
+        navigate(`/chat/${latestChat.id}`, { replace: true });
+      }
+    }, [chats, isLoadingChats]);
+
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
         <ChatArea
           currentChat={null}
-          onSendMessage={handleSendMessage}
+          onSendMessage={() => {}} // ルート画面では送信を無効化
           isTyping={isTyping}
+          bots={bots}
+          onStartNewChat={handleStartNewChat}
+          hasChats={chats.length > 0}
         />
       </div>
     );
   };
+
 
   if (authState.isLoading) {
     return (
@@ -375,7 +387,7 @@ function AppContent() {
 
   // ログインしていない場合はログイン画面を表示
   if (!authState.isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
+    return <Login onLogin={onLogin} />;
   }
 
   return (
@@ -396,7 +408,7 @@ function AppContent() {
           chats={chats}
           currentChatId={currentChatId}
           onSelectChat={handleSelectChat}
-          onCreateChat={handleCreateChat}
+          onCreateChat={handleStartNewChat}
           onDeleteChat={handleDeleteChat}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
@@ -404,10 +416,7 @@ function AppContent() {
 
         {/* メインエリア */}
         <main className="flex-1 flex flex-col overflow-hidden">
-          <Routes>
-            <Route path="/" element={<HomeRoute />} />
-            <Route path="/chat/:chatId" element={<ChatRoute />} />
-          </Routes>
+          {location.pathname === '/' ? <HomeRoute /> : <ChatRoute />}
         </main>
       </div>
 
@@ -419,10 +428,25 @@ function AppContent() {
         size="lg"
       />
       <LoadingOverlay
-        isVisible={isSendingMessage}
-        message="メッセージを送信中..."
+        isVisible={isCreatingChat}
+        message="新しいチャットを作成中..."
         backdrop="dark"
         size="lg"
+      />
+      <LoadingOverlay
+        isVisible={isLoadingChats}
+        message="チャットを読み込み中..."
+        backdrop="dark"
+        size="lg"
+      />
+
+      {/* ボット選択モーダル */}
+      <BotSelectionModal
+        isOpen={isBotSelectionModalOpen}
+        bots={bots}
+        isLoading={isLoadingChats}
+        onSelectBot={handleBotSelection}
+        onClose={() => setIsBotSelectionModalOpen(false)}
       />
     </div>
   );
@@ -431,7 +455,12 @@ function AppContent() {
 function App() {
   return (
     <AlertProvider>
-      <AppContent />
+      <Routes>
+        <Route path="/" element={<MainApp />} />
+        <Route path="/chat/:chatId" element={<MainApp />} />
+        {/* 存在しないパスは全てトップページにリダイレクト */}
+        <Route path="*" element={<MainApp />} />
+      </Routes>
     </AlertProvider>
   );
 }

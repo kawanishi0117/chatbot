@@ -1,6 +1,8 @@
 import { Bell, ChevronDown, Key, LogOut, Menu, Settings, User } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { User as UserType } from '../types';
+import LoadingButton from './loading/LoadingButton';
+import LoadingOverlay from './loading/LoadingOverlay';
 import PasswordEdit from './PasswordEdit';
 import ProfileEdit from './ProfileEdit';
 
@@ -9,6 +11,7 @@ interface HeaderProps {
   onLogout: () => void;
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
+  isLoggingOut?: boolean;
   onUserUpdate?: (updatedUser: UserType) => void;
 }
 
@@ -17,6 +20,7 @@ const Header: React.FC<HeaderProps> = ({
   onLogout,
   onToggleSidebar,
   isSidebarOpen: _isSidebarOpen,
+  isLoggingOut = false,
   onUserUpdate
 }) => {
   const [showProfileEdit, setShowProfileEdit] = useState(false);
@@ -133,13 +137,17 @@ const Header: React.FC<HeaderProps> = ({
                 </div>
               )}
 
-              <button
+              <LoadingButton
                 onClick={onLogout}
-                className="p-2 rounded-lg text-gray-600 hover:text-red-600 hover:bg-red-50 transition-colors"
+                isLoading={isLoggingOut}
+                variant="outline"
+                size="sm"
+                className="p-2 rounded-lg text-gray-600 hover:text-red-600 hover:bg-red-50 border-0 transition-colors"
                 title="ログアウト"
+                disabled={isLoggingOut}
               >
                 <LogOut className="w-5 h-5" />
-              </button>
+              </LoadingButton>
             </div>
           </div>
         </div>
@@ -161,6 +169,14 @@ const Header: React.FC<HeaderProps> = ({
           onSuccess={handlePasswordSuccess}
         />
       )}
+
+      {/* ログアウト中のローディングオーバーレイ */}
+      <LoadingOverlay
+        isVisible={isLoggingOut}
+        message="ログアウト中..."
+        backdrop="blur"
+        size="lg"
+      />
     </>
   );
 };

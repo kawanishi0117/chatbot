@@ -26,7 +26,6 @@ export const removeToken = (): void => {
 class ApiClient {
   private baseURL: string;
   private requestCache: Map<string, Promise<any>> = new Map(); // リクエストキャッシュ
-  private pendingRequests: Set<string> = new Set(); // 進行中のリクエスト追跡
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
@@ -51,14 +50,6 @@ class ApiClient {
       return this.requestCache.get(requestKey);
     }
 
-    // 重複リクエストをチェック
-    if (this.pendingRequests.has(requestKey)) {
-      console.log(`[API] Blocking duplicate request for: ${requestKey}`);
-      throw new Error('Duplicate request blocked');
-    }
-
-    this.pendingRequests.add(requestKey);
-
     const token = getToken();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -76,13 +67,39 @@ class ApiClient {
     }).then(async (response) => {
       if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-        throw new Error(error.message || `HTTP error! status: ${response.status}`);
+        
+        // HTTPステータスコードに基づいてエラーメッセージを詳細化
+        let errorMessage = error.message || `HTTP error! status: ${response.status}`;
+        
+        switch (response.status) {
+          case 401:
+            errorMessage = '認証が必要です。再度ログインしてください。';
+            // 認証エラーの場合はトークンを削除
+            removeToken();
+            break;
+          case 403:
+            errorMessage = 'アクセス権限がありません。';
+            break;
+          case 404:
+            errorMessage = '指定されたリソースが見つかりません。';
+            break;
+          case 500:
+            errorMessage = 'サーバーエラーが発生しました。しばらく後にお試しください。';
+            break;
+          default:
+            // その他のエラーはレスポンスメッセージを使用
+            break;
+        }
+        
+        const customError = new Error(errorMessage);
+        (customError as any).status = response.status;
+        (customError as any).originalMessage = error.message;
+        throw customError;
       }
       return response.json();
     }).finally(() => {
-      // リクエスト完了後にキャッシュと進行中リストから削除
+      // リクエスト完了後にキャッシュから削除
       this.requestCache.delete(requestKey);
-      this.pendingRequests.delete(requestKey);
     });
 
     // GET リクエストのみキャッシュする（短時間）
@@ -249,6 +266,116 @@ class ApiClient {
       message: string;
       botId: string;
     }>(`/api/bots/${botId}`, {
+      method: 'DELETE',
+    });
+    return response;
+  }
+
+  // ボットアクセス権限チェック
+  async checkBotAccess(botId: string): Promise<boolean> {
+    try {
+      const response = await this.request<Array<{
+        id: string;
+        chatbotId: string;
+        userId: string;
+        permission: 'read' | 'write' | 'admin';
+        createdAt: number;
+        updatedAt: number;
+        user: {
+          id: string;
+          email: string;
+          name: string;
+          role: string;
+          createdAt: number;
+          updatedAt: number;
+        };
+      }>>(`/api/bots/${botId}/users`, {
+        method: 'GET',
+      });
+      return true; // アクセス権限があればユーザー一覧を取得できる
+    } catch (error: any) {
+      if (error.status === 403) {
+        return false; // アクセス権限なし
+      }
+      if (error.status === 404) {
+        // ボットが存在しない場合
+        throw new Error('指定されたボットが見つかりません。');
+      }
+      throw error; // その他のエラーは再スロー
+    }
+  }
+
+  // ボットの存在確認
+  async checkBotExists(botId: string): Promise<boolean> {
+    try {
+      await this.getBot(botId);
+      return true;
+    } catch (error: any) {
+      if (error.status === 404) {
+        return false;
+      }
+      throw error; // その他のエラーは再スロー
+    }
+  }
+
+  // ユーザー管理API
+  async getBotUsers(botId: string) {
+    const response = await this.request<Array<{
+      id: string;
+      chatbotId: string;
+      userId: string;
+      permission: 'read' | 'write' | 'admin';
+      createdAt: number;
+      updatedAt: number;
+      user: {
+        id: string;
+        email: string;
+        name: string;
+        role: string;
+        createdAt: number;
+        updatedAt: number;
+      };
+    }>>(`/api/bots/${botId}/users`, {
+      method: 'GET',
+    });
+    return response;
+  }
+
+  async inviteUserByEmail(botId: string, email: string, permission: 'general' | 'admin') {
+    const response = await this.request<{
+      message: string;
+      userEmail: string;
+      userName: string;
+      permission: string;
+      botId: string;
+    }>(`/api/bots/${botId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ email, permission }),
+    });
+    return response;
+  }
+
+
+
+  async updateUserPermission(botId: string, userId: string, permission: 'general' | 'admin') {
+    const response = await this.request<{
+      message: string;
+      userId: string;
+      botId: string;
+      permission: string;
+    }>(`/api/bots/${botId}/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ permission }),
+    });
+    return response;
+  }
+
+  async removeUserFromBot(botId: string, userId: string) {
+    const response = await this.request<{
+      message: string;
+      userId: string;
+      botId: string;
+    }>(`/api/bots/${botId}/users/${userId}`, {
       method: 'DELETE',
     });
     return response;

@@ -1,6 +1,7 @@
 import { Edit3, MessageCircle, Plus, Trash2 } from 'lucide-react';
 import React from 'react';
 import { Chat } from '../types';
+import { useAlert } from '../contexts/AlertContext';
 
 interface SidebarProps {
   chats: Chat[];
@@ -21,6 +22,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose
 }) => {
+  const { showConfirm } = useAlert();
   const formatDate = (date: Date) => {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
@@ -117,9 +119,17 @@ const Sidebar: React.FC<SidebarProps> = ({
                             <Edit3 className="w-4 h-4 text-gray-500" />
                           </button>
                           <button
-                            onClick={(e) => {
+                            onClick={async (e) => {
                               e.stopPropagation();
-                              onDeleteChat(chat.id);
+                              const result = await showConfirm(
+                                `「${truncateTitle(chat.title)}」を削除しますか？\n\nこの操作は取り消せません。チャット履歴も完全に削除されます。`,
+                                'チャット削除の確認',
+                                '削除する',
+                                'キャンセル'
+                              );
+                              if (result) {
+                                onDeleteChat(chat.id);
+                              }
                             }}
                             className="p-2 rounded hover:bg-red-100 transition-colors"
                             aria-label="Delete chat"

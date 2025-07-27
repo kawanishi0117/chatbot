@@ -13,11 +13,13 @@ try:
     from common.responses import create_error_response, create_success_response
     from handlers.bot_settings_handler import BotSettingsHandler
     from handlers.user_handler import UserHandler
+    from handlers.chat_handler import ChatHandler
 except ImportError:
     from . import webhook_handler
     from .common.responses import create_error_response, create_success_response
     from .handlers.bot_settings_handler import BotSettingsHandler
     from .handlers.user_handler import UserHandler
+    from .handlers.chat_handler import ChatHandler
 
 # ログ設定
 logger = logging.getLogger()
@@ -94,21 +96,34 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return webhook_handler.handle_webhook_request(
                 event, context, path, http_method, body
             )
+        elif path.startswith("/api/auth") or (
+            path.startswith("/api/bots/") and ("/users" in path or "/invite" in path)
+        ):
+            # ユーザー認証・管理API処理
+            logger.info(
+                "User auth/management API request: path=%s, method=%s",
+                path,
+                http_method,
+            )
+            user_handler = UserHandler()
+            headers = event.get("headers", {}) or {}
+            return user_handler.handle_request(http_method, path, body, headers)
         elif path.startswith("/api/bots"):
             # ボット設定API処理
             logger.info(
                 "Bot settings API request: path=%s, method=%s", path, http_method
             )
             bot_handler = BotSettingsHandler()
-            return bot_handler.handle_request(http_method, path, body, query_params)
-        elif path.startswith("/api/auth"):
-            # ユーザー認証API処理
-            logger.info(
-                "User auth API request: path=%s, method=%s", path, http_method
-            )
-            user_handler = UserHandler()
             headers = event.get("headers", {}) or {}
-            return user_handler.handle_request(http_method, path, body, headers)
+            return bot_handler.handle_request(
+                http_method, path, body, query_params, headers
+            )
+        elif path.startswith("/api/chats"):
+            # チャットルーム管理API処理
+            logger.info("Chat API request: path=%s, method=%s", path, http_method)
+            chat_handler = ChatHandler()
+            headers = event.get("headers", {}) or {}
+            return chat_handler.handle_request(http_method, path, body, headers)
         elif path == "/health":
             # ヘルスチェック用エンドポイント
             logger.info("Health check endpoint accessed")

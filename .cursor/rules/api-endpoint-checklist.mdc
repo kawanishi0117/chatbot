@@ -1,0 +1,51 @@
+---
+description: "新しいAPIエンドポイント追加時の必須手順"
+globs: backend/chat-router/template.yaml,backend/chat-router/src/handlers/*.py,backend/chat-router/src/lambda_function.py
+alwaysApply: false
+---
+# APIエンドポイント追加チェックリスト
+
+新しいAPIエンドポイントを追加する際は、以下の手順を**必ず**実行してください：
+
+## 📋 必須手順
+
+### 1. バックエンド実装
+- [ ] ハンドラークラスの作成/更新 (`src/handlers/`)
+- [ ] `lambda_function.py` のルーティング追加
+- [ ] 認証が必要な場合は `get_authenticated_user(headers)` を使用
+
+### 2. ⚠️ **重要**: API Gateway設定
+- [ ] **`template.yaml`** に新しいエンドポイントのEventsを追加
+- [ ] 正しいPath, Methodを指定
+- [ ] パラメータがある場合は `{parameterId}` 形式で定義
+
+### 3. フロントエンド実装  
+- [ ] `services/api.ts` にAPIメソッド追加
+- [ ] 認証ヘッダーが自動付与されることを確認
+- [ ] エラーハンドリングの実装
+
+### 4. デプロイ
+- [ ] `sam build` 実行
+- [ ] サーバー再起動
+- [ ] エンドポイントの動作確認
+
+## 🚨 よくある落とし穴
+
+- **template.yamlの更新忘れ** → "Missing Authentication Token" エラー
+- 認証処理の実装忘れ → 401 Unauthorized エラー  
+- パスパラメータの不一致 → 404 Not Found エラー
+
+## 例: チャットAPI追加時
+```yaml
+# template.yaml
+ChatsAPI:
+  Type: Api
+  Properties:
+    Path: /api/chats
+    Method: ANY
+ChatsDetailAPI:
+  Type: Api  
+  Properties:
+    Path: /api/chats/{chatId}
+    Method: ANY
+```
