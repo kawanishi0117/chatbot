@@ -88,10 +88,18 @@ const WebhookPanel: React.FC<WebhookPanelProps> = ({ chatbot, onSave }) => {
     onSave, 
     onCancel 
   }) => {
+    // Helper to generate a cryptographically secure secret
+    function generateSecureSecret() {
+      const array = new Uint8Array(16);
+      window.crypto.getRandomValues(array);
+      // Convert to base36 string for similar format
+      return 'wh_secret_' + Array.from(array).map(b => b.toString(36)).join('').substr(0, 16);
+    }
+
     const [formData, setFormData] = useState({
       url: webhook?.url || '',
       events: webhook?.events || [],
-      secret: webhook?.secret || `wh_secret_${Math.random().toString(36).substr(2, 16)}`,
+      secret: webhook?.secret || generateSecureSecret(),
       isActive: Boolean(webhook?.isActive ?? true)
     });
 
