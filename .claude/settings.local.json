@@ -15,7 +15,25 @@
       "Bash(cp:*)",
       "Bash(npm run lint:*)",
       "Bash(timeout 10s npm run dev)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(powershell.exe:*)",
+      "Bash(ls:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker exec:*)",
+      "Bash(dos2unix:*)",
+      "Bash(sed:*)",
+      "Bash(aws:*)",
+      "Bash(curl:*)",
+      "Bash(./start-project.ps1 -Clean)",
+      "Bash(timeout:*)",
+      "Bash(docker-compose:*)",
+      "Bash(zip:*)",
+      "Bash(chmod:*)",
+      "Bash(./test-sqs-complete.sh:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(./tests/integration/test-sqs-complete.sh:*)"
     ],
     "deny": []
   }

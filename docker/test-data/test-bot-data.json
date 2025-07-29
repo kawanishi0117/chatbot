@@ -1,0 +1,28 @@
+{
+  "PK": {"S": "BOT#test-bot-001"},
+  "SK": {"S": "CONFIG"},
+  "botId": {"S": "test-bot-001"},
+  "botName": {"S": "AI開発テストボット"},
+  "description": {"S": "AI自動応答機能の開発・テスト用ボット"},
+  "creatorId": {"S": "admin"},
+  "createdAt": {"N": "1704067200000"},
+  "updatedAt": {"N": "1704067200000"},
+  "isActive": {"BOOL": true},
+  "aiConfig": {
+    "M": {
+      "defaultModel": {"S": "anthropic.claude-3-5-haiku-20241022-v2:0"},
+      "taskModelMapping": {
+        "M": {
+          "general": {"S": "anthropic.claude-3-5-haiku-20241022-v2:0"},
+          "technical": {"S": "anthropic.claude-3-5-sonnet-20241022-v2:0"},
+          "creative": {"S": "anthropic.claude-3-5-sonnet-20241022-v2:0"},
+          "analysis": {"S": "anthropic.claude-3-5-sonnet-20241022-v2:0"}
+        }
+      },
+      "maxTokens": {"N": "4096"},
+      "temperature": {"N": "0.7"},
+      "topP": {"N": "0.9"},
+      "systemPrompt": {"S": "あなたは親切なAIアシスタントです。ユーザーの質問に対して、簡潔で分かりやすい回答を心がけてください。技術的な質問には詳細に、一般的な質問には親しみやすく答えてください。"}
+    }
+  }
+}

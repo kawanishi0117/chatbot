@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { Chat, Message } from '../types';
@@ -16,6 +16,10 @@ export const useChat = () => {
     isActive: boolean;
   }>>([]);
   const [isLoadingChats, setIsLoadingChats] = useState(false);
+  const [isAIProcessing, setIsAIProcessing] = useState(false);
+  
+  // AI応答ポーリング用のタイマー参照
+  const aiPollingTimer = useRef<NodeJS.Timeout | null>(null);
 
   // ボット一覧とチャット一覧を読み込む
   const loadBotsAndChats = useCallback(async (isMounted: boolean = true, signal?: AbortSignal) => {
@@ -179,10 +183,131 @@ export const useChat = () => {
     navigate('/');
   }, [navigate]);
 
+  // AI応答ポーリングのクリーンアップ
+  const clearAIPolling = useCallback(() => {
+    if (aiPollingTimer.current) {
+      clearTimeout(aiPollingTimer.current);
+      aiPollingTimer.current = null;
+    }
+    setIsAIProcessing(false);
+  }, []);
+
+  // AI応答をポーリングして取得
+  const pollForAIResponse = useCallback(async (chatId: string, startTime: number) => {
+    const POLL_INTERVAL = 2000; // 2秒間隔
+    const MAX_POLL_TIME = 30000; // 最大30秒
+    
+    const poll = async () => {
+      try {
+        // 現在時刻をチェック
+        if (Date.now() - startTime > MAX_POLL_TIME) {
+          console.log('AI response polling timeout');
+          clearAIPolling();
+          return;
+        }
+
+        // 新しいメッセージを取得
+        const response = await api.getChatMessages(chatId);
+        const messages = response.messages;
+        
+        // 現在のチャット状態を取得
+        setChats(prevChats => {
+          const currentChat = prevChats.find(chat => chat.id === chatId);
+          if (!currentChat) {
+            clearAIPolling();
+            return prevChats;
+          }
+
+          // 新しいメッセージ（AI応答）があるかチェック
+          const newMessages = messages.filter(msg => 
+            !currentChat.messages.some(existingMsg => existingMsg.id === msg.id)
+          );
+
+          if (newMessages.length > 0) {
+            // 新しいメッセージが見つかった場合
+            const hasAIResponse = newMessages.some(msg => msg.role === 'assistant');
+            
+            if (hasAIResponse) {
+              // AI応答が含まれている場合、ポーリング停止
+              clearAIPolling();
+              
+              // メッセージを更新
+              const formattedMessages: Message[] = messages.map(msg => ({
+                id: msg.id,
+                content: msg.content,
+                role: msg.role as 'user' | 'assistant',
+                timestamp: new Date(parseInt(msg.timestamp)),
+                contentType: msg.contentType || 'text'
+              }));
+
+              return prevChats.map(chat =>
+                chat.id === chatId
+                  ? { ...chat, messages: formattedMessages, messagesLoaded: true }
+                  : chat
+              );
+            }
+          }
+
+          // AI応答がまだない場合、次のポーリングをスケジュール
+          aiPollingTimer.current = setTimeout(poll, POLL_INTERVAL);
+          return prevChats;
+        });
+
+      } catch (error) {
+        console.error('Error polling for AI response:', error);
+        clearAIPolling();
+      }
+    };
+
+    // 最初のポーリングを開始
+    aiPollingTimer.current = setTimeout(poll, POLL_INTERVAL);
+  }, [clearAIPolling]);
+
+  // メッセージ送信とAI応答待機
+  const sendMessage = useCallback(async (content: string, chatId: string) => {
+    try {
+      setIsAIProcessing(true);
+      
+      // メッセージ送信
+      await api.sendMessage(content, chatId);
+      
+      // 即座に新しいメッセージを表示
+      const userMessage: Message = {
+        id: `temp-${Date.now()}`,
+        content,
+        role: 'user',
+        timestamp: new Date(),
+        contentType: 'text'
+      };
+
+      setChats(prevChats =>
+        prevChats.map(chat =>
+          chat.id === chatId
+            ? { ...chat, messages: [...chat.messages, userMessage] }
+            : chat
+        )
+      );
+
+      // AI応答のポーリングを開始
+      await pollForAIResponse(chatId, Date.now());
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setIsAIProcessing(false);
+      
+      await showAlert(
+        'メッセージの送信に失敗しました。',
+        'error',
+        'エラー'
+      );
+    }
+  }, [pollForAIResponse, clearAIPolling, showAlert]);
+
   return {
     chats,
     bots,
     isLoadingChats,
+    isAIProcessing,
     setChats,
     loadBotsAndChats,
     loadChatMessages,
@@ -190,6 +315,8 @@ export const useChat = () => {
     handleDeleteChat,
     createChatRoom,
     addChatFromApi,
-    handleInvalidChatId
+    handleInvalidChatId,
+    sendMessage,
+    clearAIPolling
   };
 };

@@ -26,9 +26,10 @@ sam build --parallel                    # Build Lambda functions
 sam local start-api --host 0.0.0.0 --port 3000  # Start local API
 
 # PowerShell (Windows)
-.\start-project.ps1                     # Start development environment
-.\start-project.ps1 -Test              # Start with tests
-.\start-project.ps1 -Clean             # Clean and rebuild
+.\scripts\dev\start-project.ps1                     # Start development environment
+.\scripts\dev\start-project.ps1 -Test              # Start with tests
+.\scripts\dev\start-project.ps1 -Clean             # Clean and rebuild
+.\scripts\dev\start-project.ps1 -WithAI            # Start with AI auto-response features
 
 # Python linting (backend)
 cd backend/chat-router
@@ -40,10 +41,12 @@ pylint src/                            # Lint Python code
 # Frontend testing
 cd frontend/chatbot-console  # or frontend/chatbot-ui
 npm test                     # Run tests
+npm run test -- --watch     # Run tests in watch mode
 
 # Backend testing  
 cd backend/chat-router
 python test_lambda.py        # Test Lambda functions
+python -m pytest tests/     # Run pytest tests if available
 ```
 
 ### Deployment
@@ -127,12 +130,12 @@ Both frontends share similar component structure:
 - **DynamoDB handling**: Convert Decimal types to int/float before JSON response
 - **DynamoDB keys**: Use correct table and key format (PK/SK for chat_table, not roomKey/messageId)
 - **Error handling**: Catch ClientError for DynamoDB operations
-- **Code reuse**: Extract common patterns after 3+ repetitions
-- **Security**: All API endpoints require authentication checks
+- **Code reuse**: Extract common patterns after 3+ repetitions (shared functions)
+- **Security**: All API endpoints require authentication checks using `get_authenticated_user(headers)`
 
 #### Frontend:
-- **Loading states**: Display loading overlay during API calls
-- **Error handling**: Consistent alert display for API errors
+- **Loading states**: Display loading overlay during API calls (use LoadingOverlay component)
+- **Error handling**: Consistent alert display for API errors via AlertContext
 - **Authentication**: Redirect unauthorized users appropriately
 - **Confirmation dialogs**: Use `useAlert().showConfirm()` instead of `window.confirm()`
 
@@ -140,6 +143,14 @@ Both frontends share similar component structure:
 - **Signature verification**: Each platform webhook validates authenticity
 - **Input validation**: Prevent XSS/injection attacks
 - **Access control**: Proper permission checks for all operations
+
+#### API Endpoint Development (from .cursor/rules/api-endpoint-checklist.mdc):
+When adding new API endpoints:
+1. Create/update handler class in `src/handlers/`
+2. Add route to `lambda_function.py`
+3. **CRITICAL**: Update `template.yaml` with new Events configuration
+4. Add API method to frontend `services/api.ts`
+5. Test with `sam build` and server restart
 
 ### Development Environment
 - **Local backend**: Uses SAM Local API Gateway simulation
@@ -168,3 +179,52 @@ Both frontends share similar component structure:
 - **DynamoDB**: Text messages, metadata, user sessions (TTL: 24 hours)
 - **S3**: Binary content with automated cleanup
 - **Room-based**: Messages grouped by platform-specific room keys
+
+## AI Integration Architecture
+
+### Core AI Components:
+1. **Unified Lambda Function** (`src/lambda_function.py`)
+   - Handles both HTTP API requests and SQS-triggered AI processing
+   - Integrates with AWS Bedrock for Claude models
+   - Asynchronous AI processing via SQS events
+
+2. **Service Layer** (`src/services/`)
+   - `bedrock_client_service.py`: AWS Bedrock integration
+   - `model_selector_service.py`: AI model selection logic
+   - `sqs_service.py`: Queue management for async processing
+
+3. **Model Configuration**:
+   - Development: Uses basic models for cost efficiency
+   - Production: `anthropic.claude-3-haiku-20240307-v1:0` (configurable via samconfig.toml)
+
+### AI Processing Flow:
+1. User message → Platform webhook → Message normalization
+2. AI trigger detection → SQS queue → AI Processor Lambda  
+3. Bedrock API call → Response generation → Platform delivery
+
+## Scripts and Tests Organization
+
+### Directory Structure:
+```
+scripts/
+├── dev/           # Development scripts (start-project.ps1, etc.)
+├── deploy/        # Deployment scripts (setup-aws-test-data.ps1)
+└── test/          # Test scripts (reserved)
+
+tests/
+├── integration/   # Integration tests (test-sqs-complete.sh)
+├── unit/          # Unit tests (reserved)
+└── fixtures/      # Test data files (manual-lambda-event.json)
+```
+
+### SQS Integration Testing:
+```bash
+# Complete SQS→Lambda integration test
+./tests/integration/test-sqs-complete.sh
+
+# Manual Lambda function test
+cd backend/chat-router
+sam local invoke ChatRouterFunction --event ../../tests/fixtures/manual-lambda-event.json
+```
+
+See `scripts/README.md` for detailed usage instructions.

@@ -1,0 +1,20 @@
+{
+  "Records": [
+    {
+      "messageId": "00b64c93-814f-47ad-8cc5-4d79707eeec0",
+      "receiptHandle": "NTIzNGZkOTktOTM1Zi00MzQwLWFhZDItZDRlN2JjMDNjZGI3IGFybjphd3M6c3FzOnVzLWVhc3QtMTowMDAwMDAwMDAwMDA6YWktcHJvY2Vzc2luZy1xdWV1ZS1kZXYgMDBiNjRjOTMtODE0Zi00N2FkLThjYzUtNGQ3OTcwN2VlZWMwIDE3NTM4MDMzODAuMzQxNTMy",
+      "body": "{\"chatId\":\"test-auto\",\"botId\":\"test-bot\",\"userMessage\":\"自動処理テスト\"}",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1753803380341",
+        "SenderId": "MANUAL",
+        "ApproximateFirstReceiveTimestamp": "1753803380341"
+      },
+      "messageAttributes": {},
+      "md5OfBody": "8d1ecf1419f4282050dc6e0b10bd5f28",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-east-1:000000000000:ai-processing-queue-dev",
+      "awsRegion": "us-east-1"
+    }
+  ]
+}

@@ -5,12 +5,14 @@ interface ChatInputProps {
   onSendMessage: (message: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  isAIProcessing?: boolean;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({
   onSendMessage,
   disabled = false,
-  placeholder = "メッセージを入力してください..."
+  placeholder = "メッセージを入力してください...",
+  isAIProcessing = false
 }) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -82,7 +84,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
               {/* 送信ボタン */}
               <button
                 type="submit"
-                disabled={!message.trim() || disabled}
+                disabled={!message.trim() || disabled || isAIProcessing}
                 className="flex-shrink-0 p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <Send className="w-4 h-4" />
@@ -90,6 +92,20 @@ const ChatInput: React.FC<ChatInputProps> = ({
             </div>
           </div>
         </div>
+
+        {/* AI処理中インジケーター */}
+        {isAIProcessing && (
+          <div className="flex items-center justify-center mt-2 text-sm text-gray-500">
+            <div className="flex items-center space-x-2">
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+              <span>AIが応答を生成中...</span>
+            </div>
+          </div>
+        )}
 
         {/* ヒント */}
         <div className="mt-2 flex items-center justify-between text-xs text-gray-500">

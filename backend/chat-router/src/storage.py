@@ -71,6 +71,22 @@ def save_message(message: UnifiedMessage) -> Dict[str, Any]:
         if message.s3_uri:
             item["s3Uri"] = message.s3_uri
 
+        # AI応答関連フィールドを追加（存在する場合）
+        if hasattr(message, 'ai_model') and message.ai_model:
+            item["aiModel"] = message.ai_model
+        
+        if hasattr(message, 'processing_status') and message.processing_status:
+            item["processingStatus"] = message.processing_status
+            
+        if hasattr(message, 'response_time') and message.response_time is not None:
+            item["responseTime"] = message.response_time
+            
+        if hasattr(message, 'token_usage') and message.token_usage:
+            item["tokenUsage"] = message.token_usage
+            
+        if hasattr(message, 'user_message_id') and message.user_message_id:
+            item["userMessageId"] = message.user_message_id
+
         # DynamoDBに保存
         table.put_item(Item=item)
 
@@ -92,6 +108,86 @@ def save_message(message: UnifiedMessage) -> Dict[str, Any]:
         }
     except Exception as e:
         logger.error("Error saving message to DynamoDB: %s", str(e))
+        raise
+
+
+def save_ai_response_message(
+    room_key: str,
+    ai_content: str,
+    ai_model: str,
+    processing_status: str = "completed",
+    response_time: int = 0,
+    token_usage: Dict[str, Any] = None,
+    user_message_id: str = None
+) -> Dict[str, Any]:
+    """AI応答メッセージを直接DynamoDBに保存
+    
+    Args:
+        room_key: ルームキー
+        ai_content: AI応答内容
+        ai_model: 使用したAIモデル
+        processing_status: 処理状態
+        response_time: 応答時間（ms）
+        token_usage: トークン使用量
+        user_message_id: 関連するユーザーメッセージID
+        
+    Returns:
+        保存されたアイテムの詳細を含む辞書
+    """
+    try:
+        # DynamoDBテーブルの取得
+        table = dynamodb.Table(CHAT_HISTORY_TABLE)
+
+        # TTLの計算（現在時刻 + 24時間）
+        ttl = int(time.time()) + TTL_SECONDS
+        
+        # タイムスタンプを生成
+        current_timestamp = int(time.time() * 1000)
+
+        # DynamoDBに保存するアイテムの作成
+        item = {
+            "PK": room_key,
+            "SK": f"{current_timestamp:019d}",  # 19桁にゼロパディング
+            "role": "assistant",
+            "text": ai_content,
+            "contentType": "text",
+            "ttl": ttl,
+            # AI応答専用フィールド
+            "aiModel": ai_model,
+            "processingStatus": processing_status,
+            "responseTime": response_time,
+        }
+        
+        # オプショナルフィールドを追加
+        if token_usage:
+            item["tokenUsage"] = token_usage
+            
+        if user_message_id:
+            item["userMessageId"] = user_message_id
+
+        # DynamoDBに保存
+        table.put_item(Item=item)
+
+        logger.info(
+            "AI response message saved to DynamoDB: %s",
+            json.dumps(
+                {
+                    "roomKey": room_key,
+                    "timestamp": current_timestamp,
+                    "aiModel": ai_model,
+                    "responseTime": response_time,
+                }
+            ),
+        )
+
+        return {
+            "status": "success",
+            "message": "AI response saved successfully",
+            "item": item,
+            "messageId": f"{current_timestamp:019d}",
+        }
+    except Exception as e:
+        logger.error("Error saving AI response to DynamoDB: %s", str(e))
         raise
 
 

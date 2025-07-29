@@ -88,6 +88,9 @@ class BaseWebhookHandler(ABC):
             # メッセージの保存
             storage.save_message(message)
 
+            # プラットフォーム固有の後処理（AI処理トリガー等）
+            self._post_process(message, body)
+
             # 成功レスポンス
             response_data = create_platform_success_response(
                 self.platform_name, message.room_key, message.ts
@@ -149,6 +152,15 @@ class BaseWebhookHandler(ABC):
             バイナリデータ処理済みのメッセージ
         """
         return message
+
+    def _post_process(self, message: UnifiedMessage, body: Any) -> None:
+        """メッセージ保存後の後処理（デフォルト実装は何もしない）
+        
+        Args:
+            message: 保存されたメッセージ
+            body: リクエストボディ
+        """
+        pass  # デフォルトでは何もしない（サブクラスでオーバーライド）
 
     def _hmac_sha256(self, key: str, data: str) -> str:
         """HMAC-SHA256ハッシュの生成

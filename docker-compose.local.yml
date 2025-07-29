@@ -1,0 +1,84 @@
+# AI自動応答機能開発用のローカル環境構築
+# Windows11 + Docker Desktop 対応
+# 構成: AWS DynamoDB (実際のAWS) + ローカルSQS/EventBridge
+
+version: '3.8'
+
+services:
+  # LocalStack - SQS/EventBridge/Lambda 専用（DynamoDBは実AWS使用）
+  localstack:
+    image: localstack/localstack:latest
+    container_name: chatbot-localstack
+    ports:
+      - "4566:4566"           # LocalStack Gateway
+      - "4510-4559:4510-4559" # 外部サービスポート範囲
+    environment:
+      # 使用するAWSサービス（DynamoDBを除外）
+      SERVICES: sqs,events,lambda,s3,secretsmanager,iam
+      # リージョン設定（実AWSと合わせる）
+      AWS_DEFAULT_REGION: ap-northeast-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      # デバッグ設定
+      DEBUG: 1
+      # Docker設定
+      DOCKER_HOST: unix:///var/run/docker.sock
+      # データ永続化
+      DATA_DIR: /tmp/localstack/data
+      # ホスト名設定
+      HOSTNAME_EXTERNAL: localhost
+      # Lambda設定
+      LAMBDA_EXECUTOR: docker
+      LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT: 900
+      # AWS接続許可（実DynamoDB用）
+      LAMBDA_REMOTE_DOCKER: false
+    volumes:
+      # データ永続化用ボリューム
+      - "${TMPDIR:-/tmp}/localstack:/var/lib/localstack"
+      # Docker ソケット
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      # 初期化スクリプト用
+      - "./docker/localstack-init:/etc/localstack/init/ready.d"
+      # AWS設定をマウント（実DynamoDB接続用）
+      - "${HOME}/.aws:/root/.aws:ro"
+    networks:
+      - chatbot-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+
+  # AWS CLI コンテナ - 初期化スクリプト実行用
+  aws-cli:
+    image: amazon/aws-cli:latest
+    container_name: chatbot-aws-cli
+    environment:
+      # LocalStack用の認証情報
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: ap-northeast-1
+    volumes:
+      - "./docker/scripts:/scripts"
+      # 実AWS用の認証情報もマウント（DynamoDB/Bedrock用）
+      - "${HOME}/.aws:/root/.aws:ro"
+    networks:
+      - chatbot-network
+    profiles:
+      - init
+    depends_on:
+      localstack:
+        condition: service_healthy
+
+networks:
+  chatbot-network:
+    driver: bridge
+
+volumes: {}
+
+# 使用例:
+# 基本構成: docker-compose -f docker-compose.local.yml up
+# 初期化実行: docker-compose -f docker-compose.local.yml --profile init run aws-cli
+
+# 注意: 基本的にAWS DynamoDBを使用するため、~/.aws/credentials の設定が必要
